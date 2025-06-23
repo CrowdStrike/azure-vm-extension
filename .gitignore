@@ -23,3 +23,13 @@ go.work.sum
 
 # env file
 .env
+.DS_Store
+
+# archive files
+*.zip
+*.tar
+*.tar.gz
+*.gz
+
+# installer files
+falcon-installer*
