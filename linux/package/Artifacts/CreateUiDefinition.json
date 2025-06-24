@@ -1,0 +1,301 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/0.1.2-preview/CreateUIDefinition.MultiVm.json#",
+  "handler": "Microsoft.Compute.MultiVm",
+  "version": "0.1.2-preview",
+  "parameters": {
+    "basics": [],
+    "steps": [
+      {
+        "name": "falconApiConfig",
+        "label": "Falcon API Configuration",
+        "elements": [
+          {
+            "name": "apiAuthSection",
+            "type": "Microsoft.Common.Section",
+            "label": "Authentication",
+            "elements": [
+              {
+                "name": "authType",
+                "type": "Microsoft.Common.OptionsGroup",
+                "label": "Authentication Method",
+                "defaultValue": "OAuth2 Credentials",
+                "toolTip": "Select the authentication method for the CrowdStrike Falcon Platform",
+                "constraints": {
+                  "allowedValues": [
+                    {
+                      "label": "OAuth2 Credentials",
+                      "value": "oauth2Creds"
+                    },
+                    {
+                      "label": "Access Token",
+                      "value": "accessToken"
+                    }
+                  ],
+                  "required": true
+                },
+                "visible": true
+              },
+              {
+                "name": "clientId",
+                "type": "Microsoft.Common.TextBox",
+                "label": "Client ID",
+                "toolTip": "Client ID for accessing CrowdStrike Falcon Platform",
+                "constraints": {
+                  "required": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'oauth2Creds')]",
+                  "regex": "^.+$",
+                  "validationMessage": "Client ID is required for OAuth2 authentication"
+                },
+                "visible": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'oauth2Creds')]"
+              },
+              {
+                "name": "clientSecret",
+                "type": "Microsoft.Common.PasswordBox",
+                "label": {
+                  "password": "Client Secret"
+                },
+                "toolTip": "Client Secret for accessing CrowdStrike Falcon Platform",
+                "constraints": {
+                  "required": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'oauth2Creds')]",
+                  "regex": "^.+$",
+                  "validationMessage": "Client Secret is required for OAuth2 authentication"
+                },
+                "options": {
+                  "hideConfirmation": true
+                },
+                "visible": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'oauth2Creds')]"
+              },
+              {
+                "name": "accessToken",
+                "type": "Microsoft.Common.PasswordBox",
+                "label": {
+                  "password": "Access Token"
+                },
+                "toolTip": "Access token for accessing CrowdStrike Falcon Platform",
+                "constraints": {
+                  "required": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'accessToken')]",
+                  "regex": "^.+$",
+                  "validationMessage": "Access Token is required"
+                },
+                "options": {
+                  "hideConfirmation": true
+                },
+                "visible": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'accessToken')]"
+              },
+              {
+                "name": "memberCid",
+                "type": "Microsoft.Common.TextBox",
+                "label": "Member CID (MSSP)",
+                "defaultValue": "",
+                "toolTip": "Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)",
+                "constraints": {
+                  "required": false,
+                  "regex": "^[0-9a-fA-F]{32}$",
+                  "validationMessage": "Please enter a valid 32-character CID"
+                },
+                "visible": true
+              }
+            ]
+          },
+          {
+            "name": "cloudSection",
+            "type": "Microsoft.Common.Section",
+            "label": "Cloud Configuration",
+            "elements": [
+              {
+                "name": "cloud",
+                "type": "Microsoft.Common.DropDown",
+                "label": "Falcon Cloud",
+                "defaultValue": "Auto Discover (Recommended)",
+                "toolTip": "Falcon cloud abbreviation. Auto Discover is recommended and will automatically determine the correct cloud.",
+                "constraints": {
+                  "allowedValues": [
+                    {
+                      "label": "Auto Discover (Recommended)",
+                      "value": "autodiscover"
+                    },
+                    {
+                      "label": "US-1",
+                      "value": "us-1"
+                    },
+                    {
+                      "label": "US-2",
+                      "value": "us-2"
+                    },
+                    {
+                      "label": "EU-1",
+                      "value": "eu-1"
+                    }
+                  ],
+                  "required": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "sensorConfig",
+        "label": "Falcon Sensor Configuration",
+        "elements": [
+          {
+            "name": "sensorVersionSection",
+            "type": "Microsoft.Common.Section",
+            "label": "Sensor Version",
+            "elements": [
+              {
+                "name": "sensorUpdatePolicy",
+                "type": "Microsoft.Common.TextBox",
+                "label": "Sensor Update Policy",
+                "defaultValue": "platform_default",
+                "toolTip": "The sensor update policy name to use for sensor installation",
+                "constraints": {
+                  "required": false
+                }
+              }
+            ]
+          },
+          {
+            "name": "tokenSection",
+            "type": "Microsoft.Common.Section",
+            "label": "Provisioning Token",
+            "elements": [
+              {
+                "name": "provisioningToken",
+                "type": "Microsoft.Common.TextBox",
+                "label": "Provisioning Token",
+                "defaultValue": "",
+                "toolTip": "The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token",
+                "constraints": {
+                  "required": false
+                }
+              }
+            ]
+          },
+          {
+            "name": "proxySection",
+            "type": "Microsoft.Common.Section",
+            "label": "Proxy Configuration",
+            "elements": [
+              {
+                "name": "disableProxy",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Disable Proxy Settings",
+                "toolTip": "Disable the sensor proxy settings"
+              },
+              {
+                "name": "proxyHost",
+                "type": "Microsoft.Common.TextBox",
+                "label": "Proxy Host",
+                "defaultValue": "",
+                "toolTip": "The proxy host for the sensor to use when communicating with CrowdStrike",
+                "constraints": {
+                  "required": false
+                },
+                "visible": "[not(steps('sensorConfig').proxySection.disableProxy)]"
+              },
+              {
+                "name": "proxyPort",
+                "type": "Microsoft.Common.TextBox",
+                "label": "Proxy Port",
+                "defaultValue": "",
+                "toolTip": "The proxy port for the sensor to use when communicating with CrowdStrike",
+                "constraints": {
+                  "required": false,
+                  "regex": "^[0-9]*$",
+                  "validationMessage": "Proxy port must be a number"
+                },
+                "visible": "[not(steps('sensorConfig').proxySection.disableProxy)]"
+              },
+              {
+                "name": "pacUrl",
+                "type": "Microsoft.Common.TextBox",
+                "label": "PAC URL",
+                "defaultValue": "",
+                "toolTip": "Configure a proxy connection using the URL of a PAC file when communicating with CrowdStrike",
+                "constraints": {
+                  "required": false,
+                  "regex": "^(https?:\\/\\/)?([\\da-z\\.-]+)\\.([a-z\\.]{2,6})([\\/\\w \\.-]*)*\\/?$",
+                  "validationMessage": "Please enter a valid URL"
+                },
+                "visible": "[not(steps('sensorConfig').proxySection.disableProxy)]"
+              }
+            ]
+          },
+          {
+            "name": "tagsSection",
+            "type": "Microsoft.Common.Section",
+            "label": "Tags",
+            "elements": [
+              {
+                "name": "tags",
+                "type": "Microsoft.Common.TextBox",
+                "label": "Sensor Tags",
+                "defaultValue": "",
+                "toolTip": "A comma separated list of tags for sensor grouping",
+                "constraints": {
+                  "required": false
+                }
+              }
+            ]
+          },
+          {
+            "name": "windowsInstallSection",
+            "type": "Microsoft.Common.Section",
+            "label": "Windows Installation Settings",
+            "elements": [
+              {
+                "name": "disableStart",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Disable Automatic Start",
+                "toolTip": "Prevent the sensor from starting after installation until a reboot occurs"
+              },
+              {
+                "name": "vdi",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Enable VDI Mode",
+                "toolTip": "Enable virtual desktop infrastructure mode"
+              },
+              {
+                "name": "disableProvisioningWait",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Disable Provisioning Wait",
+                "toolTip": "Disabling allows the Windows installer more provisioning time"
+              },
+              {
+                "name": "provisioningWaitTime",
+                "type": "Microsoft.Common.TextBox",
+                "label": "Provisioning Wait Time (ms)",
+                "defaultValue": "1200000",
+                "toolTip": "The number of milliseconds to wait for the sensor to provision",
+                "constraints": {
+                  "required": "[not(steps('sensorConfig').windowsInstallSection.disableProvisioningWait)]",
+                  "regex": "^[0-9]*$",
+                  "validationMessage": "Please enter a valid number in milliseconds"
+                },
+                "visible": "[not(steps('sensorConfig').windowsInstallSection.disableProvisioningWait)]"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "outputs": {
+      "access-token": "[steps('falconApiConfig').apiAuthSection.accessToken]",
+      "client-id": "[steps('falconApiConfig').apiAuthSection.clientId]",
+      "client-secret": "[steps('falconApiConfig').apiAuthSection.clientSecret]",
+      "cloud": "[steps('falconApiConfig').cloudSection.cloud]",
+      "member-cid": "[steps('falconApiConfig').apiAuthSection.memberCid]",
+      "sensor-update-policy": "[steps('sensorConfig').sensorVersionSection.sensorUpdatePolicy]",
+      "disable-proxy": "[steps('sensorConfig').proxySection.disableProxy]",
+      "provisioning-token": "[steps('sensorConfig').tokenSection.provisioningToken]",
+      "proxy-host": "[steps('sensorConfig').proxySection.proxyHost]",
+      "proxy-port": "[steps('sensorConfig').proxySection.proxyPort]",
+      "tags": "[steps('sensorConfig').tagsSection.tags]",
+      "disable-provisioning-wait": "[steps('sensorConfig').windowsInstallSection.disableProvisioningWait]",
+      "disable-start": "[steps('sensorConfig').windowsInstallSection.disableStart]",
+      "pac-url": "[steps('sensorConfig').proxySection.pacUrl]",
+      "provisioning-wait-time": "[steps('sensorConfig').windowsInstallSection.provisioningWaitTime]",
+      "vdi": "[steps('sensorConfig').windowsInstallSection.vdi]"
+    }
+  }
+}

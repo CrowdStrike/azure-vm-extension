@@ -1,0 +1,171 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vmName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the virtual machine to install the extension on"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources"
+      }
+    },
+    "access-token": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Access token for accessing CrowdStrike Falcon Platform"
+      }
+    },
+    "client-id": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Client ID for accessing CrowdStrike Falcon Platform"
+      }
+    },
+    "client-secret": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Client Secret for accessing CrowdStrike Falcon Platform"
+      }
+    },
+    "cloud": {
+      "type": "string",
+      "defaultValue": "autodiscover",
+      "metadata": {
+        "description": "Falcon cloud abbreviation (e.g. us-1, us-2, eu-1, us-gov-1)"
+      }
+    },
+    "member-cid": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)"
+      }
+    },
+    "sensor-update-policy": {
+      "type": "string",
+      "defaultValue": "platform_default",
+      "metadata": {
+        "description": "The sensor update policy name to use for sensor installation"
+      }
+    },
+    "disable-proxy": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Disable the sensor proxy settings"
+      }
+    },
+    "provisioning-token": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token"
+      }
+    },
+    "proxy-host": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "The proxy host for the sensor to use when communicating with CrowdStrike"
+      }
+    },
+    "proxy-port": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "The proxy port for the sensor to use when communicating with CrowdStrike"
+      }
+    },
+    "tags": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "A comma separated list of tags for sensor grouping"
+      }
+    },
+    "disable-provisioning-wait": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Disabling allows the Windows installer more provisioning time"
+      }
+    },
+    "disable-start": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Prevent the sensor from starting after installation until a reboot occurs"
+      }
+    },
+    "pac-url": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Configure a proxy connection using the URL of a PAC file when communicating with CrowdStrike"
+      }
+    },
+    "provisioning-wait-time": {
+      "type": "string",
+      "defaultValue": "1200000",
+      "metadata": {
+        "description": "The number of milliseconds to wait for the sensor to provision"
+      }
+    },
+    "vdi": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable virtual desktop infrastructure mode"
+      }
+    }
+  },
+  "variables": {
+    "extensionName": "FalconSensorLinux",
+    "extensionPublisher": "CrowdStrike.Falcon.Test",
+    "extensionType": "FalconSensorLinux",
+    "extensionTypeHandlerVersion": "0.0.0.1"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Compute/virtualMachines/extensions",
+      "apiVersion": "2022-03-01",
+      "name": "[concat(parameters('vmName'), '/', variables('extensionName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "publisher": "[variables('extensionPublisher')]",
+        "type": "[variables('extensionType')]",
+        "typeHandlerVersion": "[variables('extensionTypeHandlerVersion')]",
+        "autoUpgradeMinorVersion": true,
+        "settings": {
+          "cloud": "[parameters('cloud')]",
+          "member-cid": "[parameters('member-cid')]",
+          "sensor-update-policy": "[parameters('sensor-update-policy')]",
+          "disable-proxy": "[parameters('disable-proxy')]",
+          "proxy-host": "[parameters('proxy-host')]",
+          "proxy-port": "[parameters('proxy-port')]",
+          "tags": "[parameters('tags')]",
+          "disable-provisioning-wait": "[parameters('disable-provisioning-wait')]",
+          "disable-start": "[parameters('disable-start')]",
+          "pac-url": "[parameters('pac-url')]",
+          "provisioning-wait-time": "[parameters('provisioning-wait-time')]",
+          "vdi": "[parameters('vdi')]"
+        },
+        "protectedSettings": {
+          "access-token": "[parameters('access-token')]",
+          "client-id": "[parameters('client-id')]",
+          "client-secret": "[parameters('client-secret')]",
+          "provisioning-token": "[parameters('provisioning-token')]"
+        }
+      }
+    }
+  ]
+}

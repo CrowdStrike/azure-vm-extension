@@ -1,0 +1,7 @@
+{
+  "displayName": "CrowdStrike Falcon Sensor",
+  "publisherDisplayName": "CrowdStrike",
+  "summary": "Automate CrowdStrike Falcon sensor deployment across your Azure Virtual Machines",
+  "description": "<p>Easily deploy CrowdStrike Falcon® across Azure instances in your Azure environments.</p><p>Use a policy-driven approach to ensure your workload gets protected from the moment it's created, allowing you to stay compliant and ahead of the adversary.</p> See <a target=\"_blank\" href=\"https://github.com/crowdstrike/azure-vm-extension\">https://github.com/crowdstrike/azure-vm-extension</a> for more information.</p>",
+  "link1": "CrowdStrike"
+}
