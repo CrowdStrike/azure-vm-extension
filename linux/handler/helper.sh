@@ -121,6 +121,10 @@ run_falcon_installer() {
 
     # Get Config file
     get_config_file
+
+    if [ ! -d "$logs_dir" ]; then
+        mkdir -p "$logs_dir"
+    fi
     
     # Run the installer with appropriate parameters
     if [ "$operation" = "uninstall" ]; then

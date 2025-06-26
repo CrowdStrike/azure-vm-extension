@@ -8,6 +8,7 @@
     "disableCommand": "disable.sh",
     "rebootAfterInstall": false,
     "reportHeartbeat": false,
-    "updateMode": "UpdateWithoutInstall"
+    "updateMode": "UpdateWithoutInstall",
+    "continueOnUpdateFailure": "true"
   }
 }]
