@@ -1,6 +1,6 @@
 {
   "$schema": "https://gallery.azure.com/schemas/2015-04-01/manifest.json#",
-  "name": "crowdstrike-falcon-linux-arm",
+  "name": "CrowdStrike-falcon-windows-arm",
   "publisher": "CrowdStrike",
   "version": "0.0.1",
   "displayName": "ms-resource:displayName",
@@ -39,12 +39,12 @@
     }
   ],
   "categories": [
-    "compute-vmextension-linux"
+    "compute-vmextension-windows"
   ],
   "filters": [
     {
       "type": "HideKey",
-      "value": "crowdstrike_falcon-linux"
+      "value": "crowdstrike_falcon-windows"
     }
   ]
 }

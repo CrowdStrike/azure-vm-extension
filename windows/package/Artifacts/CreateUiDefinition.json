@@ -237,6 +237,47 @@
                 }
               }
             ]
+          },
+          {
+            "name": "additionalInstallationSettings",
+            "type": "Microsoft.Common.Section",
+            "label": "Additional Installation Settings",
+            "elements": [
+              {
+                "name": "disableStart",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Disable Automatic Start",
+                "toolTip": "Prevent the sensor from starting after installation until a reboot occurs",
+                "defaultValue": false
+              },
+              {
+                "name": "vdi",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Enable VDI Mode",
+                "toolTip": "Enable virtual desktop infrastructure mode",
+                "defaultValue": false
+              },
+              {
+                "name": "disableProvisioningWait",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Disable Provisioning Wait",
+                "toolTip": "Disabling allows the Windows installer more provisioning time",
+                "defaultValue": false
+              },
+              {
+                "name": "provisioningWaitTime",
+                "type": "Microsoft.Common.TextBox",
+                "label": "Provisioning Wait Time (ms)",
+                "defaultValue": "1200000",
+                "toolTip": "The number of milliseconds to wait for the sensor to provision",
+                "constraints": {
+                  "required": "[not(steps('sensorConfig').windowsInstallSection.disableProvisioningWait)]",
+                  "regex": "^[0-9]*$",
+                  "validationMessage": "Please enter a valid number in milliseconds"
+                },
+                "visible": "[not(steps('sensorConfig').windowsInstallSection.disableProvisioningWait)]"
+              }
+            ]
           }
         ]
       }
@@ -252,7 +293,12 @@
       "provisioning-token": "[steps('sensorConfig').tokenSection.provisioningToken]",
       "proxy-host": "[steps('sensorConfig').proxySection.proxyHost]",
       "proxy-port": "[steps('sensorConfig').proxySection.proxyPort]",
-      "tags": "[steps('sensorConfig').tagsSection.tags]"
+      "tags": "[steps('sensorConfig').tagsSection.tags]",
+      "disable-provisioning-wait": "[steps('sensorConfig').additionalInstallationSettings.disableProvisioningWait]",
+      "disable-start": "[steps('sensorConfig').additionalInstallationSettings.disableStart]",
+      "pac-url": "[steps('sensorConfig').proxySection.pacUrl]",
+      "provisioning-wait-time": "[steps('sensorConfig').additionalInstallationSettings.provisioningWaitTime]",
+      "vdi": "[steps('sensorConfig').additionalInstallationSettings.vdi]"
     }
   }
 }

@@ -91,12 +91,47 @@
       "metadata": {
         "description": "A comma separated list of tags for sensor grouping"
       }
+    },
+    "disable-provisioning-wait": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Disabling allows the Windows installer more provisioning time"
+      }
+    },
+    "disable-start": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Prevent the sensor from starting after installation until a reboot occurs"
+      }
+    },
+    "pac-url": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Configure a proxy connection using the URL of a PAC file when communicating with CrowdStrike"
+      }
+    },
+    "provisioning-wait-time": {
+      "type": "string",
+      "defaultValue": "1200000",
+      "metadata": {
+        "description": "The number of milliseconds to wait for the sensor to provision"
+      }
+    },
+    "vdi": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable virtual desktop infrastructure mode"
+      }
     }
   },
   "variables": {
-    "extensionName": "FalconSensorLinux",
+    "extensionName": "FalconSensorWindows",
     "extensionPublisher": "CrowdStrike.Falcon",
-    "extensionType": "FalconSensorLinux",
+    "extensionType": "FalconSensorWindows",
     "extensionTypeHandlerVersion": "0.0.0.1"
   },
   "resources": [
@@ -117,7 +152,12 @@
           "disable-proxy": "[parameters('disable-proxy')]",
           "proxy-host": "[parameters('proxy-host')]",
           "proxy-port": "[parameters('proxy-port')]",
-          "tags": "[parameters('tags')]"
+          "tags": "[parameters('tags')]",
+          "disable-provisioning-wait": "[parameters('disable-provisioning-wait')]",
+          "disable-start": "[parameters('disable-start')]",
+          "pac-url": "[parameters('pac-url')]",
+          "provisioning-wait-time": "[parameters('provisioning-wait-time')]",
+          "vdi": "[parameters('vdi')]"
         },
         "protectedSettings": {
           "access-token": "[parameters('access-token')]",
