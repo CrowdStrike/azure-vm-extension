@@ -33,3 +33,6 @@ go.work.sum
 
 # installer files
 falcon-installer*
+
+# cline configuration
+.clinerules
