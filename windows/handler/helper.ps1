@@ -198,7 +198,7 @@ function Invoke-FalconInstaller {
     $installerArgs = @(
         "--verbose",
         "--enable-file-logging",
-        "--user-agent=`"$VERSION`"",
+        "--user-agent=`"azure-vm-extension/$VERSION`"",
         "--tmpdir", "`"$tempDir`"",
         "--config", "`"$CONFIG_FILE`""
     )

@@ -129,10 +129,10 @@ run_falcon_installer() {
     # Run the installer with appropriate parameters
     if [ "$operation" = "uninstall" ]; then
         log "INFO" "[$operation_upper] running the Falcon installer to remove the Falcon sensor..."
-        { installer_output=$(sudo "$script_path/$INSTALLER" --uninstall --verbose --enable-file-logging --user-agent="$VERSION" --tmpdir "$logs_dir" --config "$CONFIG_FILE" 2>"$logs_dir/falcon-installer.log"); installer_exit_code=$?; } || true
+        { installer_output=$(sudo "$script_path/$INSTALLER" --uninstall --verbose --enable-file-logging --user-agent="azure-vm-extension/$VERSION" --tmpdir "$logs_dir" --config "$CONFIG_FILE" 2>"$logs_dir/falcon-installer.log"); installer_exit_code=$?; } || true
     else
         log "INFO" "[$operation_upper] running the Falcon installer..."
-        { installer_output=$(sudo "$script_path/$INSTALLER" --verbose --enable-file-logging --user-agent="$VERSION" --tmpdir "$logs_dir" --config "$CONFIG_FILE" 2>"$logs_dir/falcon-installer.log"); installer_exit_code=$?; } || true
+        { installer_output=$(sudo "$script_path/$INSTALLER" --verbose --enable-file-logging --user-agent="azure-vm-extension/$VERSION" --tmpdir "$logs_dir" --config "$CONFIG_FILE" 2>"$logs_dir/falcon-installer.log"); installer_exit_code=$?; } || true
     fi
     
     if [ $installer_exit_code -eq 0 ]; then
