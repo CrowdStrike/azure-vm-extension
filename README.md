@@ -1,13 +1,49 @@
 # CrowdStrike Azure VM Extension
 
-The CrowdStrike Azure VM Extension is an open-source solution that simplifies and automates the installation of the CrowdStrike Falcon sensor on Azure virtual machines.
+The CrowdStrike Azure VM Extension is an open-source solution that simplifies and automates the installation of the CrowdStrike Falcon sensor on Azure virtual machines at enterprise scale.
 
 ## Overview
 
-The CrowdStrike Azure VM Extension allows you to:
-- Deploy the Falcon sensor to Azure VMs at scale
-- Manage sensor configuration and updates
-- Integrate CrowdStrike protection into your Azure infrastructure
+The CrowdStrike Azure VM Extension provides:
+
+- **Automated Deployment**: Deploy the Falcon sensor to Azure VMs at scale using Azure's native extension framework
+- **Cross-Platform Support**: Support for both Linux and Windows Azure virtual machines
+- **Enterprise Integration**: Seamless integration with Azure infrastructure and CrowdStrike APIs
+- **Lifecycle Management**: Handle sensor installation, configuration, updates, and removal
+- **Architecture Support**: Support for both x86_64 and arm64 architectures on Linux
+
+## Architecture
+
+The extension follows Azure VM Extension standards with a handler-based architecture:
+
+### Handler Framework
+- **Lifecycle Operations**: Install, enable, disable, uninstall, and update operations
+- **Platform-Specific Implementation**: Separate Linux (bash) and Windows (PowerShell) handlers
+- **Azure Integration**: Native integration with Azure VM Extension framework
+- **Status Reporting**: Structured JSON status updates to Azure portal
+
+### Deployment Flow
+1. **Azure invokes** the extension handler with configuration parameters
+2. **Handler validates** the configuration and credentials
+3. **CrowdStrike API** is called to download the appropriate sensor package
+4. **Falcon installer** is executed to install and configure the sensor
+5. **Status reporting** back to Azure portal with success/failure information
+
+## Supported Platforms
+
+### Linux Distributions
+- Ubuntu 18.04, 20.04, 22.04 LTS
+- Debian 10, 11, 12
+- Red Hat Enterprise Linux 8, 9
+- SUSE Linux Enterprise Server 15
+
+### Windows Versions
+- Windows Server 2019
+- Windows Server 2022
+
+### Architectures
+- **Linux**: x86_64 and arm64
+- **Windows**: x86_64
 
 ## Falcon API Permissions
 
@@ -26,43 +62,82 @@ Ensure the following API scopes are enabled:
 ## Installation
 
 The extension can be deployed through:
-- Azure Portal
-- Azure CLI
-- Azure Resource Manager templates
+- **Azure Portal** - Individual VM deployment
+- **Azure CLI** - Command-line deployment
+- **Azure Resource Manager templates** - Infrastructure as Code
+- **Azure Policy** - Enterprise-scale automated deployment (see [Policy Templates](policy/README.md))
 
 ## Usage
 
-Basic deployment examples
+### Azure CLI
 
-### Linux
-
-```shell
+#### Linux
+```bash
 az vm extension set \
   --resource-group myResourceGroup \
   --vm-name myVM \
   --name FalconSensorLinux \
   --publisher Crowdstrike.Falcon \
-  --protected-settings '{"client_id":"YOUR_CLIENT_ID","client_secret":"YOUR_CLIENT_SECRET"}'
+  --protected-settings '{
+    "client_id": "YOUR_CLIENT_ID",
+    "client_secret": "YOUR_CLIENT_SECRET"
+  }'
 ```
 
-### Windows
-
-```shell
+#### Windows
+```bash
 az vm extension set \
   --resource-group myResourceGroup \
   --vm-name myVM \
   --name FalconSensorWindows \
   --publisher Crowdstrike.Falcon \
-  --protected-settings '{"client_id":"YOUR_CLIENT_ID","client_secret":"YOUR_CLIENT_SECRET"}'
+  --protected-settings '{
+    "client_id": "YOUR_CLIENT_ID",
+    "client_secret": "YOUR_CLIENT_SECRET"
+  }'
 ```
+
+### Azure Portal
+1. Navigate to your virtual machine in the Azure Portal
+2. Select "Extensions + applications" from the left menu
+3. Click "Add" and search for "CrowdStrike Falcon"
+4. Select the appropriate extension (Linux or Windows)
+5. Configure the required parameters and install
+
+## Documentation
+
+- **[FAQ](docs/faq.md)** - Frequently asked questions and troubleshooting
+- **[Testing Guide](tests/TESTING.md)** - Information about the testing framework
+- **[Policy Templates](policy/README.md)** - Azure Policy deployment guide for enterprise-scale deployment
 
 ## Configuration
 
-The extension supports the following configuration parameters:
+### Required Parameters
+| Parameter | Description |
+|-----------|-------------|
+| `client_id` | CrowdStrike API Client ID |
+| `client_secret` | CrowdStrike API Client Secret |
 
-- `client_id`: Your CrowdStrike API Client ID
-- `client_secret`: Your CrowdStrike API Client Secret
-- Additional parameters for advanced configuration
+### Optional Parameters
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `cloud` | CrowdStrike cloud region (us-1, us-2, eu-1, us-gov-1) | Auto-detected |
+| `tags` | Comma-separated list of sensor tags | None |
+| `sensor_update_policy` | Sensor update policy name | platform_default |
+| `provisioning_token` | Installation token (if required) | None |
+
+### Windows-Specific Parameters
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `proxy_host` | HTTP proxy hostname | None |
+| `proxy_port` | HTTP proxy port | None |
+| `provisioning_wait_time` | Sensor provisioning timeout (ms) | 1200000 |
+
+### Linux-Specific Parameters
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `proxy_host` | HTTP proxy hostname | None |
+| `proxy_port` | HTTP proxy port | None |
 
 ## Frequently Asked Questions (FAQs)
 
@@ -74,7 +149,7 @@ We welcome contributions that improve the installation and distribution processe
 
 ## Support
 
-Falcon Installer is a community-driven, open source project designed to streamline the deployment and use of the CrowdStrike Falcon sensor. While not a formal CrowdStrike product, Falcon Installer is maintained by CrowdStrike and supported in partnership with the open source developer community.
+The CrowdStrike Azure VM Extension is a community-driven, open source project designed to streamline the deployment and use of the CrowdStrike Falcon sensor. While not a formal CrowdStrike product, Falcon Installer is maintained by CrowdStrike and supported in partnership with the open source developer community.
 
 For additional support, please see the [SUPPORT.md](SUPPORT.md) file.
 
