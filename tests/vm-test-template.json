@@ -1,0 +1,331 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "type": "string",
+            "defaultValue": "centraluseuap",
+            "metadata": {
+                "description": "Location for all resources (use EUAP for testing)"
+            }
+        },
+        "vmName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the virtual machine"
+            }
+        },
+        "computerName": {
+            "type": "string",
+            "metadata": {
+                "description": "Computer name for the VM (hostname inside the OS)"
+            }
+        },
+        "vmSize": {
+            "type": "string",
+            "defaultValue": "Standard_D2s_v3",
+            "metadata": {
+                "description": "Size of the virtual machine"
+            }
+        },
+        "adminUsername": {
+            "type": "string",
+            "defaultValue": "azureuser",
+            "metadata": {
+                "description": "Admin username for the VM"
+            }
+        },
+        "adminPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Password for the Virtual Machine"
+            }
+        },
+        "osType": {
+            "type": "string",
+            "allowedValues": [
+                "Windows",
+                "Linux"
+            ],
+            "metadata": {
+                "description": "Operating System type (Windows or Linux)"
+            }
+        },
+        "imagePublisher": {
+            "type": "string",
+            "defaultValue": "MicrosoftWindowsServer",
+            "metadata": {
+                "description": "Publisher of the VM image (e.g., MicrosoftWindowsServer, Canonical, Debian, RedHat, SUSE)"
+            }
+        },
+        "imageOffer": {
+            "type": "string",
+            "defaultValue": "WindowsServer",
+            "metadata": {
+                "description": "Offer of the VM image (e.g., WindowsServer, 0001-com-ubuntu-server-jammy, debian-12, RHEL)"
+            }
+        },
+        "imageSku": {
+            "type": "string",
+            "defaultValue": "2022-datacenter-g2",
+            "metadata": {
+                "description": "SKU of the VM image (e.g., 2022-datacenter-g2, 22_04-lts-gen2, 12-gen2, 9-lvm-gen2)"
+            }
+        },
+        "imageVersion": {
+            "type": "string",
+            "defaultValue": "latest",
+            "metadata": {
+                "description": "Version of the VM image"
+            }
+        },
+        "architecture": {
+            "type": "string",
+            "defaultValue": "x86_64",
+            "allowedValues": [
+                "x86_64",
+                "arm64"
+            ],
+            "metadata": {
+                "description": "Architecture of the VM (x86_64 or arm64) - only applies to Linux"
+            }
+        },
+        "falconClientId": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Crowdstrike API Client ID"
+            }
+        },
+        "falconClientSecret": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Crowdstrike API Client Secret"
+            }
+        },
+        "sensorTags": {
+            "type": "string",
+            "defaultValue": "vmextensiontest",
+            "metadata": {
+                "description": "Comma-separated list of sensor tags for grouping"
+            }
+        },
+        "sensorUpdatePolicy": {
+            "type": "string",
+            "defaultValue": "platform_default",
+            "metadata": {
+                "description": "Sensor update policy setting for Crowdstrike Falcon sensor"
+            }
+        },
+        "useTestExtension": {
+            "type": "bool",
+            "defaultValue": true,
+            "metadata": {
+                "description": "Use test extension instead of production"
+            }
+        },
+        "extensionVersion": {
+            "type": "string",
+            "defaultValue": "0.0",
+            "metadata": {
+                "description": "Extension version to test (use 0.0 for latest test version)"
+            }
+        }
+    },
+    "variables": {
+        "virtualNetworkName": "[concat(parameters('vmName'), '-vnet')]",
+        "subnetName": "default",
+        "networkInterfaceName": "[concat(parameters('vmName'), '-nic')]",
+        "networkSecurityGroupName": "[concat(parameters('vmName'), '-nsg')]",
+        "subnetRef": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('virtualNetworkName'), variables('subnetName'))]",
+        "extensionPublisher": "Crowdstrike.Falcon",
+        "isLinux": "[equals(parameters('osType'), 'Linux')]",
+        "isWindows": "[equals(parameters('osType'), 'Windows')]",
+        "extensionName": "[if(variables('isLinux'), if(parameters('useTestExtension'), 'TestFalconSensorLinux', 'FalconSensorLinux'), if(parameters('useTestExtension'), 'TestFalconSensorWindows', 'FalconSensorWindows'))]",
+        "isArm64Image": "[or(contains(parameters('imageSku'), 'arm64'), contains(parameters('imageSku'), 'ARM64'))]",
+        "vmSizeForArch": "[if(and(variables('isLinux'), variables('isArm64Image')), 'Standard_D2pls_v5', parameters('vmSize'))]",
+        "requiresPlan": "[and(equals(parameters('imagePublisher'), 'RedHat'), equals(parameters('imageOffer'), 'rh-rhel'))]",
+        "planPublisher": "[if(variables('requiresPlan'), 'redhat', parameters('imagePublisher'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2023-09-01",
+            "name": "[variables('networkSecurityGroupName')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "DenyAllInbound",
+                        "properties": {
+                            "description": "Deny all inbound traffic for security",
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Deny",
+                            "priority": 1000,
+                            "direction": "Inbound"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2023-09-01",
+            "name": "[variables('virtualNetworkName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+            ],
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "10.0.0.0/16"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('subnetName')]",
+                        "properties": {
+                            "addressPrefix": "10.0.0.0/24",
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2023-09-01",
+            "name": "[variables('networkInterfaceName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "subnet": {
+                                "id": "[variables('subnetRef')]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2023-09-01",
+            "name": "[parameters('vmName')]",
+            "location": "[parameters('location')]",
+            "plan": "[if(variables('requiresPlan'), createObject('name', parameters('imageSku'), 'product', parameters('imageOffer'), 'publisher', variables('planPublisher')), null())]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[variables('vmSizeForArch')]"
+                },
+                "osProfile": {
+                    "computerName": "[parameters('computerName')]",
+                    "adminUsername": "[parameters('adminUsername')]",
+                    "adminPassword": "[parameters('adminPassword')]",
+                    "windowsConfiguration": "[if(variables('isWindows'), createObject('enableAutomaticUpdates', true(), 'provisionVMAgent', true()), null())]",
+                    "linuxConfiguration": "[if(variables('isLinux'), createObject('disablePasswordAuthentication', false(), 'provisionVMAgent', true()), null())]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[parameters('imagePublisher')]",
+                        "offer": "[parameters('imageOffer')]",
+                        "sku": "[parameters('imageSku')]",
+                        "version": "[parameters('imageVersion')]"
+                    },
+                    "osDisk": {
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "Premium_LRS"
+                        }
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2023-09-01",
+            "name": "[concat(parameters('vmName'), '/CrowdstrikeFalconSensor')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
+            ],
+            "properties": {
+                "publisher": "[variables('extensionPublisher')]",
+                "type": "[variables('extensionName')]",
+                "typeHandlerVersion": "[parameters('extensionVersion')]",
+                "autoUpgradeMinorVersion": true,
+                "protectedSettings": {
+                    "client_id": "[parameters('falconClientId')]",
+                    "client_secret": "[parameters('falconClientSecret')]",
+                    "tags": "[parameters('sensorTags')]",
+                    "sensor_update_policy": "[parameters('sensorUpdatePolicy')]"
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "vmName": {
+            "type": "string",
+            "value": "[parameters('vmName')]"
+        },
+        "location": {
+            "type": "string",
+            "value": "[parameters('location')]"
+        },
+        "osType": {
+            "type": "string",
+            "value": "[parameters('osType')]"
+        },
+        "imageDetails": {
+            "type": "string",
+            "value": "[concat(parameters('imagePublisher'), ':', parameters('imageOffer'), ':', parameters('imageSku'))]"
+        },
+        "architecture": {
+            "type": "string",
+            "value": "[if(variables('isLinux'), parameters('architecture'), 'N/A')]"
+        },
+        "debugInfo": {
+            "type": "object",
+            "value": {
+                "isLinux": "[variables('isLinux')]",
+                "architecture": "[parameters('architecture')]",
+                "osType": "[parameters('osType')]",
+                "vmSizeForArch": "[variables('vmSizeForArch')]"
+            }
+        },
+        "vmSize": {
+            "type": "string",
+            "value": "[variables('vmSizeForArch')]"
+        },
+        "extensionDeployed": {
+            "type": "string",
+            "value": "[variables('extensionName')]"
+        },
+        "extensionVersion": {
+            "type": "string",
+            "value": "[parameters('extensionVersion')]"
+        }
+    }
+}

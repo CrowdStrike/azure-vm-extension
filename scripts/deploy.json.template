@@ -1,0 +1,65 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]"
+        }
+    },
+    "variables": {
+        "publisherName": "Crowdstrike.Falcon",
+        "typeName": "{{TYPE_NAME}}",
+        "label": "{{LABEL}}",
+        "description": "{{DESCRIPTION}}",
+        "companyName": "Crowdstrike",
+        "eula": "https://www.crowdstrike.com/en-us/legal/terms-conditions/",
+        "privacyUri": "https://www.crowdstrike.com/en-us/legal/privacy-notice/",
+        "homepageUri": "https://github.com/crowdstrike/azure-vm-extension",
+        "version": "{{VERSION}}", // Update this version for each new release. This can be in the format of a.b.c or a.b.c.d
+        "mediaLink": "{{MEDIA_LINK}}",
+        "regions": "REGIONS_PLACEHOLDER", // Region names where your extensions need to be published. Specify ["*"] if the extension needs to be published in all the available regions
+        "isInternalExtension": "{{INTERNAL_EXTENSION}}", // Specify "true", if you want your extension to be internal
+        "computeRole": "IaaS",
+        "supportedOS": "{{SUPPORTED_OS}}",
+        "supportedArchitectures": ["x64", "arm64"], // The values can be either ["x64"] or ["x64", "arm64"],
+        "safeDeploymentPolicy": "Minimal"
+    },
+    "resources": [{
+            "type": "Microsoft.Compute/sharedVMExtensions",
+            "name": "[concat(variables('publisherName'), '.', variables('typeName'))]",
+            "apiVersion": "2021-07-01",
+            "location": "[parameters('location')]",
+            "properties": {
+                "identifier": {
+                    "publisher": "[variables('publisherName')]",
+                    "type": "[variables('typeName')]"
+                },
+                "label": "[variables('label')]",
+                "description": "[variables('description')]",
+                "companyName": "[variables('companyName')]",
+                "eula": "[variables('eula')]",
+                "privacyUri": "[variables('privacyUri')]",
+                "homepageUri": "[variables('homepageUri')]"
+            }
+        },
+        {
+            "type": "Microsoft.Compute/sharedVMExtensions/versions",
+            "name": "[concat(variables('publisherName'), '.', variables('typeName'), '/', variables('version'))]",
+            "apiVersion": "2021-07-01",
+            "location": "[parameters('location')]",
+            "properties": {
+                "mediaLink": "[variables('mediaLink')]",
+                "regions": "[variables('regions')]",
+                "computeRole": "[variables('computeRole')]",
+                "supportedOS": "[variables('supportedOS')]",
+                "supportedArchitectures": "[variables('supportedArchitectures')]",
+                "isInternalExtension": "[variables('isInternalExtension')]",
+                "safeDeploymentPolicy": "[variables('safeDeploymentPolicy')]",
+                "configuration": {
+                    "isJsonExtension": "True"
+                }
+            }
+        }
+    ]
+}

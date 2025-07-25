@@ -1,0 +1,60 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "value": "centraluseuap"
+        },
+        "vmName": {
+            "value": "CSTestVM"
+        },
+        "computerName": {
+            "value": "cstestvm"
+        },
+        "vmSize": {
+            "value": "Standard_D2s_v3"
+        },
+        "adminUsername": {
+            "value": "azureuser"
+        },
+        "adminPassword": {
+            "value": "REPLACE_WITH_SECURE_PASSWORD"
+        },
+        "osType": {
+            "value": "Linux"
+        },
+        "imagePublisher": {
+            "value": "Canonical"
+        },
+        "imageOffer": {
+            "value": "0001-com-ubuntu-server-jammy"
+        },
+        "imageSku": {
+            "value": "22_04-lts-gen2"
+        },
+        "imageVersion": {
+            "value": "latest"
+        },
+        "architecture": {
+            "value": "x86_64"
+        },
+        "falconClientId": {
+            "value": "REPLACE_WITH_CLIENT_ID"
+        },
+        "falconClientSecret": {
+            "value": "REPLACE_WITH_CLIENT_SECRET"
+        },
+        "useTestExtension": {
+            "value": true
+        },
+        "extensionVersion": {
+            "value": "0.0"
+        },
+        "sensorTags": {
+            "value": "vmextensiontest"
+        },
+        "sensorUpdatePolicy": {
+            "value": "REPLACE_WITH_SENSOR_UPDATE_POLICY"
+        }
+    }
+}
