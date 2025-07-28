@@ -31,19 +31,24 @@ The extension follows Azure VM Extension standards with a handler-based architec
 
 ## Supported Platforms
 
-### Linux Distributions
-- Ubuntu 18.04, 20.04, 22.04 LTS
-- Debian 10, 11, 12
-- Red Hat Enterprise Linux 8, 9
-- SUSE Linux Enterprise Server 15
+> [!NOTE]
+> For a complete list of supported platforms and versions, architectures, and compatibility, please refer to the CrowdStrike documentation.
+
+### Supported Linux Distributions
+
+See [https://falcon.crowdstrike.com/documentation/page/edd7717e/falcon-sensor-for-linux-system-requirements](https://falcon.crowdstrike.com/documentation/page/edd7717e/falcon-sensor-for-linux-system-requirements) for detailed support information and a complete list of:supported platforms:
+
+- Ubuntu LTS
+- Debian
+- Red Hat Enterprise Linux
+- SUSE Linux Enterprise Server
 
 ### Windows Versions
-- Windows Server 2019
-- Windows Server 2022
 
-### Architectures
-- **Linux**: x86_64 and arm64
-- **Windows**: x86_64
+See [https://falcon.crowdstrike.com/documentation/page/ecc97e75/falcon-sensor-for-windows-deployment](https://falcon.crowdstrike.com/documentation/page/ecc97e75/falcon-sensor-for-windows-deployment) for detailed support information and a complete list of supported platforms:
+
+- Windows Server
+- Windows Desktop
 
 ## Falcon API Permissions
 
@@ -103,6 +108,10 @@ az vm extension set \
 3. Click "Add" and search for "CrowdStrike Falcon"
 4. Select the appropriate extension (Linux or Windows)
 5. Configure the required parameters and install
+
+### Azure Policy
+
+For automated enterprise-scale deployment using Azure Policy, see the [Policy Templates](policy/README.md) documentation for detailed instructions on deploying CrowdStrike Falcon at scale using Azure Policy. The templates support both subscription and management group level assignments, with automatic detection of Windows and Linux VMs.
 
 ## Documentation
 

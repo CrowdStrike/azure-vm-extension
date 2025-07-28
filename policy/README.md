@@ -8,10 +8,6 @@ This folder contains Azure Policy templates for automated deployment of CrowdStr
 - **`falcon-subscription.bicep`** - Creates policy definitions and assignments at subscription level
 - **`falcon-managementgroup.bicep`** - Creates policy assignments at management group level
 
-### User Interface Definitions
-- **`ui.json`** - Comprehensive UI definition for management group deployment
-- **`ui-subscription.json`** - Simplified UI definition for subscription deployment
-
 ## Features
 
 ### Core Functionality
@@ -43,6 +39,7 @@ This folder contains Azure Policy templates for automated deployment of CrowdStr
 
 Deploy policies at the subscription level to cover all VMs in the subscription:
 
+#### Azure CLI
 ```bash
 # Deploy both Linux and Windows policies
 az deployment sub create \
@@ -59,7 +56,7 @@ az deployment sub create \
   --parameters \
     operatingSystem="linux" \
     clientId="your-client-id" \
-    clientSecret="your-client-secret"
+    clientSecret="your-client-secret" \
     cloud="gov1"
 
 # Deploy only Windows policy
@@ -72,10 +69,41 @@ az deployment sub create \
     clientSecret="your-client-secret"
 ```
 
+#### PowerShell
+```powershell
+# Deploy both Linux and Windows policies
+New-AzSubscriptionDeployment `
+  -Location "East US" `
+  -TemplateFile "falcon-subscription.bicep" `
+  -clientId "your-client-id" `
+  -clientSecret "your-client-secret"
+
+# Deploy only Linux policy
+New-AzSubscriptionDeployment `
+  -Location "East US" `
+  -TemplateFile "falcon-subscription.bicep" `
+  -operatingSystem "linux" `
+  -clientId "your-client-id" `
+  -clientSecret "your-client-secret" `
+  -cloud "gov1"
+
+# Deploy only Windows policy
+New-AzSubscriptionDeployment `
+  -Location "East US" `
+  -TemplateFile "falcon-subscription.bicep" `
+  -operatingSystem "windows" `
+  -clientId "your-client-id" `
+  -clientSecret "your-client-secret"
+```
+
 ### Option 2: Management Group Level
 
-Deploy policy assignments at the management group level for enterprise-wide deployment. **Note**: Requires existing policy definitions from subscription level deployment first.
+Deploy policy assignments at the management group level for enterprise-wide deployment.
 
+> [!IMPORTANT]
+> Requires existing policy definitions from subscription level deployment first.
+
+#### Azure CLI
 ```bash
 # First, deploy subscription-level policies to create policy definitions
 az deployment sub create \
@@ -95,14 +123,23 @@ az deployment mg create \
     clientSecret="your-client-secret"
 ```
 
-## Azure Portal Deployment
+#### PowerShell
+```powershell
+# First, deploy subscription-level policies to create policy definitions
+New-AzSubscriptionDeployment `
+  -Location "East US" `
+  -TemplateFile "falcon-subscription.bicep" `
+  -clientId "your-client-id" `
+  -clientSecret "your-client-secret"
 
-1. Navigate to Azure Portal > Create a resource
-2. Search for "Template deployment"
-3. Select "Build your own template in the editor"
-4. Upload the appropriate `.bicep` file
-5. Use the corresponding UI definition file
-6. Configure parameters and deploy
+# Then deploy management group assignments
+New-AzManagementGroupDeployment `
+  -ManagementGroupId "my-management-group" `
+  -Location "East US" `
+  -TemplateFile "falcon-managementgroup.bicep" `
+  -clientId "your-client-id" `
+  -clientSecret "your-client-secret"
+```
 
 ## Prerequisites
 
@@ -169,6 +206,7 @@ The templates create managed identities that need **Virtual Machine Contributor*
 
 When `createRoleAssignments=false`, you must manually assign the VM Contributor role:
 
+#### Azure CLI
 ```bash
 # Get policy assignment principal IDs from deployment outputs
 LINUX_PRINCIPAL_ID=$(az deployment sub show --name YourDeploymentName --query 'properties.outputs.linuxPolicyPrincipalId.value' -o tsv)
@@ -184,4 +222,23 @@ az role assignment create \
   --assignee "$WINDOWS_PRINCIPAL_ID" \
   --role "Virtual Machine Contributor" \
   --scope "/subscriptions/$(az account show --query id -o tsv)"
+```
+
+#### PowerShell
+```powershell
+# Get policy assignment principal IDs from deployment outputs
+$deploymentName = "YourDeploymentName"
+$linuxPrincipalId = (Get-AzSubscriptionDeployment -Name $deploymentName).Outputs.linuxPolicyPrincipalId.Value
+$windowsPrincipalId = (Get-AzSubscriptionDeployment -Name $deploymentName).Outputs.windowsPolicyPrincipalId.Value
+
+# Assign VM Contributor role to managed identities
+New-AzRoleAssignment `
+  -ObjectId $linuxPrincipalId `
+  -RoleDefinitionName "Virtual Machine Contributor" `
+  -Scope "/subscriptions/$((Get-AzContext).Subscription.Id)"
+
+New-AzRoleAssignment `
+  -ObjectId $windowsPrincipalId `
+  -RoleDefinitionName "Virtual Machine Contributor" `
+  -Scope "/subscriptions/$((Get-AzContext).Subscription.Id)"
 ```
