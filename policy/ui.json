@@ -327,7 +327,7 @@
                   "regex": "^(https?:\\/\\/)?([\\da-z\\.-]+)\\.([a-z\\.]{2,6})([\\/\\w \\.-]*)*\\/?$",
                   "validationMessage": "Please enter a valid URL"
                 },
-                "visible": "[not(steps('sensorConfig').proxySection.disableProxy)]"
+                "visible": "[and(not(steps('sensorConfig').proxySection.disableProxy), or(equals(steps('policySettings').policySection.operatingSystem, 'windows'), equals(steps('policySettings').policySection.operatingSystem, 'both')))]"
               }
             ]
           },
@@ -352,7 +352,7 @@
             "name": "windowsInstallSection",
             "type": "Microsoft.Common.Section",
             "label": "Windows Installation Settings",
-            "visible": "[equals(steps('policySettings').policySection.operatingSystem, 'windows')]",
+            "visible": "[or(equals(steps('policySettings').policySection.operatingSystem, 'windows'), equals(steps('policySettings').policySection.operatingSystem, 'both'))]",
             "elements": [
               {
                 "name": "disableStart",
@@ -412,11 +412,11 @@
       "proxyHost": "[steps('sensorConfig').proxySection.proxyHost]",
       "proxyPort": "[steps('sensorConfig').proxySection.proxyPort]",
       "tags": "[steps('sensorConfig').tagsSection.tags]",
-      "pacUrl": "[steps('sensorConfig').proxySection.pacUrl]",
-      "disableProvisioningWait": "[if(equals(steps('policySettings').policySection.operatingSystem, 'windows'), steps('sensorConfig').windowsInstallSection.disableProvisioningWait, false)]",
-      "disableStart": "[if(equals(steps('policySettings').policySection.operatingSystem, 'windows'), steps('sensorConfig').windowsInstallSection.disableStart, false)]",
-      "provisioningWaitTime": "[if(equals(steps('policySettings').policySection.operatingSystem, 'windows'), steps('sensorConfig').windowsInstallSection.provisioningWaitTime, '1200000')]",
-      "vdi": "[if(equals(steps('policySettings').policySection.operatingSystem, 'windows'), steps('sensorConfig').windowsInstallSection.vdi, false)]"
+      "pacUrl": "[if(or(equals(steps('policySettings').policySection.operatingSystem, 'windows'), equals(steps('policySettings').policySection.operatingSystem, 'both')), steps('sensorConfig').proxySection.pacUrl, '')]",
+      "disableProvisioningWait": "[if(or(equals(steps('policySettings').policySection.operatingSystem, 'windows'), equals(steps('policySettings').policySection.operatingSystem, 'both')), steps('sensorConfig').windowsInstallSection.disableProvisioningWait, false)]",
+      "disableStart": "[if(or(equals(steps('policySettings').policySection.operatingSystem, 'windows'), equals(steps('policySettings').policySection.operatingSystem, 'both')), steps('sensorConfig').windowsInstallSection.disableStart, false)]",
+      "provisioningWaitTime": "[if(or(equals(steps('policySettings').policySection.operatingSystem, 'windows'), equals(steps('policySettings').policySection.operatingSystem, 'both')), steps('sensorConfig').windowsInstallSection.provisioningWaitTime, '1200000')]",
+      "vdi": "[if(or(equals(steps('policySettings').policySection.operatingSystem, 'windows'), equals(steps('policySettings').policySection.operatingSystem, 'both')), steps('sensorConfig').windowsInstallSection.vdi, false)]"
     }
   }
 }
