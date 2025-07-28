@@ -40,11 +40,5 @@
   ],
   "categories": [
     "compute-vmextension-windows"
-  ],
-  "filters": [
-    {
-      "type": "HideKey",
-      "value": "crowdstrike_falcon-windows"
-    }
   ]
 }

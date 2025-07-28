@@ -137,7 +137,7 @@
   "resources": [
     {
       "type": "Microsoft.Compute/virtualMachines/extensions",
-      "apiVersion": "2022-03-01",
+      "apiVersion": "2023-09-01",
       "name": "[concat(parameters('vmName'), '/', variables('extensionName'))]",
       "location": "[parameters('location')]",
       "properties": {

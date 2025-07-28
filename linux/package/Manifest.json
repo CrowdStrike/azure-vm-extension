@@ -40,11 +40,5 @@
   ],
   "categories": [
     "compute-vmextension-linux"
-  ],
-  "filters": [
-    {
-      "type": "HideKey",
-      "value": "crowdstrike_falcon-linux"
-    }
   ]
 }
