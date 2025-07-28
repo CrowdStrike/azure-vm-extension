@@ -34,11 +34,11 @@ OPTIONS:
     -h, --help                          Show this help message
 
 EXAMPLES:
-    $0 --publish -v 1.0.0.1 -p all -r "Central US EUAP,South Central US"
-    $0 --test -v 0.5.0.1 -p linux
-    $0 --publish -v 1.2.3.4 -p windows -r "Central US EUAP"
-    $0 --test -v 0.5.0.1 -p all -o ./deployment-files
-    $0 --publish -v 1.0.0.1 -p linux -o /tmp/azure-deployments
+    $0 --publish -v 1.0.0 -p all -r "Central US EUAP,South Central US"
+    $0 --test -v 0.0.0.1 -p linux
+    $0 --publish -v 1.2.3 -p windows -r "Central US EUAP"
+    $0 --test -v 0.0.0.12 -p all -o ./deployment-files
+    $0 --publish -v 1.0.0 -p linux -o /tmp/azure-deployments
 
 This script reads from $TEMPLATE_FILE and generates deployment files in the specified output directory:
     - Publish mode: deploy-linux.json, deploy-windows.json
@@ -108,6 +108,12 @@ fi
 if [[ -z "$VERSION" ]]; then
     echo "Error: Version is required"
     show_usage
+    exit 1
+fi
+
+# Validate test version format
+if [[ "$TEST_MODE" == true && ! "$VERSION" =~ ^0\.0\.0\.[0-9]+$ ]]; then
+    echo "Error: Test mode version must be in format 0.0.0.[digits] (e.g., 0.0.0.1, 0.0.0.123)"
     exit 1
 fi
 
@@ -200,12 +206,12 @@ generate_deployment() {
             type_name="TestFalconSensorLinux"
             label="Test Extension for the CrowdStrike Falcon Sensor for Linux"
             description="CrowdStrike Falcon Sensor for Linux Test Extension"
-            media_link="https://vmextensiontest.blob.core.windows.net/linuxextension/testlinuxextension.zip"
+            media_link="https://vmextensiontest.blob.core.windows.net/extensions/testlinuxextension-${VERSION}.zip"
         else
             type_name="FalconSensorLinux"
             label="CrowdStrike Falcon Sensor for Linux VM Extension"
             description="CrowdStrike Falcon Sensor for Linux provides real-time protection, detection, and response capabilities for Linux virtual machines, detecting advanced threats and stopping breaches."
-            media_link="https://vmextensiontest.blob.core.windows.net/linuxextension/linuxextension.zip"
+            media_link="https://publishvmextension.blob.core.windows.net/extensions/linuxextension-${VERSION}.zip"
         fi
     else # windows
         supported_os="Windows"
@@ -213,12 +219,12 @@ generate_deployment() {
             type_name="TestFalconSensorWindows"
             label="Test Extension for the CrowdStrike Falcon Sensor for Windows"
             description="CrowdStrike Falcon Sensor for Windows Test Extension"
-            media_link="https://vmextensiontest.blob.core.windows.net/windowsextension/testwindowsextension.zip"
+            media_link="https://vmextensiontest.blob.core.windows.net/extensions/testwindowsextension-${VERSION}.zip"
         else
             type_name="FalconSensorWindows"
             label="CrowdStrike Falcon Sensor for Windows VM Extension"
             description="CrowdStrike Falcon Sensor for Windows provides real-time protection, detection, and response capabilities for Windows virtual machines, detecting advanced threats and stopping breaches."
-            media_link="https://vmextensiontest.blob.core.windows.net/windowsextension/windowsextension.zip"
+            media_link="https://publishvmextension.blob.core.windows.net/extensions/windowsextension-${VERSION}.zip"
         fi
     fi
     

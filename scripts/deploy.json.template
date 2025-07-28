@@ -28,7 +28,7 @@
     "resources": [{
             "type": "Microsoft.Compute/sharedVMExtensions",
             "name": "[concat(variables('publisherName'), '.', variables('typeName'))]",
-            "apiVersion": "2021-07-01",
+            "apiVersion": "2023-09-01",
             "location": "[parameters('location')]",
             "properties": {
                 "identifier": {
@@ -46,8 +46,11 @@
         {
             "type": "Microsoft.Compute/sharedVMExtensions/versions",
             "name": "[concat(variables('publisherName'), '.', variables('typeName'), '/', variables('version'))]",
-            "apiVersion": "2021-07-01",
+            "apiVersion": "2023-09-01",
             "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/sharedVMExtensions/', variables('publisherName'), '.', variables('typeName'))]"
+            ],
             "properties": {
                 "mediaLink": "[variables('mediaLink')]",
                 "regions": "[variables('regions')]",
