@@ -195,7 +195,7 @@ generate_deployment() {
         internal_extension="true"
     else
         # For publish mode, use provided regions or default
-        local default_array='["Central US EUAP", "South Central US"]'
+        local default_array='["Central US EUAP", "West Central US"]'
         regions=$(format_regions "$REGIONS" "$default_array")
         internal_extension="false"
     fi
@@ -211,7 +211,7 @@ generate_deployment() {
             type_name="FalconSensorLinux"
             label="CrowdStrike Falcon Sensor for Linux VM Extension"
             description="CrowdStrike Falcon Sensor for Linux provides real-time protection, detection, and response capabilities for Linux virtual machines, detecting advanced threats and stopping breaches."
-            media_link="https://publishvmextension.blob.core.windows.net/extensions/linuxextension-${VERSION}.zip"
+            media_link="https://publishvmextension.blob.core.windows.net/extensions/csfalcon-linuxextension-${VERSION}.zip"
         fi
     else # windows
         supported_os="Windows"
@@ -224,7 +224,7 @@ generate_deployment() {
             type_name="FalconSensorWindows"
             label="CrowdStrike Falcon Sensor for Windows VM Extension"
             description="CrowdStrike Falcon Sensor for Windows provides real-time protection, detection, and response capabilities for Windows virtual machines, detecting advanced threats and stopping breaches."
-            media_link="https://publishvmextension.blob.core.windows.net/extensions/windowsextension-${VERSION}.zip"
+            media_link="https://publishvmextension.blob.core.windows.net/extensions/csfalcon-windowsextension-${VERSION}.zip"
         fi
     fi
     
@@ -248,17 +248,17 @@ generate_deployment() {
 # Generate files based on platform selection
 if [[ "$PLATFORM" == "all" || "$PLATFORM" == "linux" ]]; then
     if [[ "$ENVIRONMENT" == "test" ]]; then
-        generate_deployment "linux" "test" "$OUTPUT_DIR/test-linux.json"
+        generate_deployment "linux" "test" "$OUTPUT_DIR/test-linux-extension.json"
     else
-        generate_deployment "linux" "publish" "$OUTPUT_DIR/deploy-linux.json"
+        generate_deployment "linux" "publish" "$OUTPUT_DIR/publish-linux-extension.json"
     fi
 fi
 
 if [[ "$PLATFORM" == "all" || "$PLATFORM" == "windows" ]]; then
     if [[ "$ENVIRONMENT" == "test" ]]; then
-        generate_deployment "windows" "test" "$OUTPUT_DIR/test-windows.json"
+        generate_deployment "windows" "test" "$OUTPUT_DIR/test-windows-extension.json"
     else
-        generate_deployment "windows" "publish" "$OUTPUT_DIR/deploy-windows.json"
+        generate_deployment "windows" "publish" "$OUTPUT_DIR/publish-windows-extension.json"
     fi
 fi
 

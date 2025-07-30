@@ -37,8 +37,8 @@ EXAMPLES:
     $0 --test --publish -v 2.1.0       # Create both test and publish packages
 
 This script creates zip packages from the handler and package directories:
-    - Test mode: {platform}-handler-test-{version}.zip
-    - Publish mode: {platform}-handler-{version}.zip, {platform}-ui-{version}.zip
+    - Test mode: csfalcon-{platform}-handler-test-{version}.zip, csfalcon-deployment-test-{version}.zip
+    - Publish mode: csfalcon-{platform}-handler-{version}.zip, csfalcon-{platform}-ui-{version}.zip, csfalcon-azure-policy-{version}.zip, csfalcon-deployment-{version}.zip
 EOF
 }
 
@@ -78,13 +78,22 @@ create_handler_package() {
     if [[ "${package_type}" == "test" ]]; then
         zip_suffix="-test"
     fi
-    local zip_name="${platform}-handler${zip_suffix}-${version}.zip"
+    local zip_name="csfalcon-${platform}-handler${zip_suffix}-${version}.zip"
     local zip_path="${OUTPUT_DIR}/${zip_name}"
     
     echo "Generating ${zip_name}..."
     
-    cd "${handler_dir}"
-    zip -r "${zip_path}" . -q
+    cd "${handler_dir}" || {
+        echo "Error: Failed to change to handler directory: ${handler_dir}"
+        return 1
+    }
+    
+    if ! zip -r "${zip_path}" . -q; then
+        echo "Error: Failed to create zip file: ${zip_path}"
+        cd "${PROJECT_ROOT}"
+        return 1
+    fi
+    
     cd "${PROJECT_ROOT}"
     
     echo "✓ Created ${zip_name}"
@@ -110,14 +119,127 @@ create_ui_package() {
     if [[ "${package_type}" == "test" ]]; then
         zip_suffix="-test"
     fi
-    local zip_name="${platform}-ui${zip_suffix}-${version}.zip"
+    local zip_name="csfalcon-${platform}-ui${zip_suffix}-${version}.zip"
     local zip_path="${OUTPUT_DIR}/${zip_name}"
     
     echo "Generating ${zip_name}..."
     
-    cd "${package_dir}"
-    zip -r "${zip_path}" . -q
+    cd "${package_dir}" || {
+        echo "Error: Failed to change to package directory: ${package_dir}"
+        return 1
+    }
+    
+    if ! zip -r "${zip_path}" . -q; then
+        echo "Error: Failed to create zip file: ${zip_path}"
+        cd "${PROJECT_ROOT}"
+        return 1
+    fi
+    
     cd "${PROJECT_ROOT}"
+    
+    echo "✓ Created ${zip_name}"
+    return 0
+}
+
+# Function to create policy package
+create_policy_package() {
+    local package_type=$1  # "test" or "publish"
+    local version=$2
+    
+    local policy_dir="${PROJECT_ROOT}/policy"
+    
+    if [[ ! -d "${policy_dir}" ]]; then
+        echo "Error: Policy directory not found: ${policy_dir}"
+        return 1
+    fi
+    
+    # Create zip file in output directory
+    local zip_suffix=""
+    if [[ "${package_type}" == "test" ]]; then
+        zip_suffix="-test"
+    fi
+    local zip_name="csfalcon-azure-policy${zip_suffix}-${version}.zip"
+    local zip_path="${OUTPUT_DIR}/${zip_name}"
+    
+    echo "Generating ${zip_name}..."
+    
+    cd "${policy_dir}" || {
+        echo "Error: Failed to change to policy directory: ${policy_dir}"
+        return 1
+    }
+    
+    if ! zip -r "${zip_path}" . -q; then
+        echo "Error: Failed to create zip file: ${zip_path}"
+        cd "${PROJECT_ROOT}"
+        return 1
+    fi
+    
+    cd "${PROJECT_ROOT}"
+    
+    echo "✓ Created ${zip_name}"
+    return 0
+}
+
+# Function to create deployment package
+create_deployment_package() {
+    local package_type=$1  # "test" or "publish"
+    local version=$2
+    
+    # Create zip file in output directory
+    local zip_suffix=""
+    if [[ "${package_type}" == "test" ]]; then
+        zip_suffix="-test"
+    fi
+    local zip_name="csfalcon-publish${zip_suffix}-extension-${version}.zip"
+    local zip_path="${OUTPUT_DIR}/${zip_name}"
+    
+    echo "Generating ${zip_name}..."
+    
+    # Create temporary directory for deployment files
+    local temp_dir=$(mktemp -d)
+    
+    # Copy deployment files to temp directory
+    if [[ "${package_type}" == "test" ]]; then
+        # For test mode, look for test deployment files
+        if [[ -f "${PROJECT_ROOT}/test-linux-extension.json" ]]; then
+            cp "${PROJECT_ROOT}/test-linux-extension.json" "${temp_dir}/"
+        fi
+        if [[ -f "${PROJECT_ROOT}/test-windows-extension.json" ]]; then
+            cp "${PROJECT_ROOT}/test-windows-extension.json" "${temp_dir}/"
+        fi
+    else
+        # For publish mode, look for publish deployment files
+        if [[ -f "${PROJECT_ROOT}/publish-linux-extension.json" ]]; then
+            cp "${PROJECT_ROOT}/publish-linux-extension.json" "${temp_dir}/"
+        fi
+        if [[ -f "${PROJECT_ROOT}/publish-windows-extension.json" ]]; then
+            cp "${PROJECT_ROOT}/publish-windows-extension.json" "${temp_dir}/"
+        fi
+    fi
+    
+    # Check if we have any files to package
+    if [[ -z "$(ls -A ${temp_dir})" ]]; then
+        echo "Error: No deployment files found to package"
+        rm -rf "${temp_dir}"
+        return 1
+    fi
+    
+    # Create zip from temp directory
+    cd "${temp_dir}" || {
+        echo "Error: Failed to change to temp directory: ${temp_dir}"
+        rm -rf "${temp_dir}"
+        return 1
+    }
+    
+    if ! zip -r "${zip_path}" . -q; then
+        echo "Error: Failed to create zip file: ${zip_path}"
+        cd "${PROJECT_ROOT}"
+        rm -rf "${temp_dir}"
+        return 1
+    fi
+    
+    cd "${PROJECT_ROOT}"
+    rm -rf "${temp_dir}"
     
     echo "✓ Created ${zip_name}"
     return 0
@@ -170,7 +292,8 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -o|--output-dir)
-            OUTPUT_DIR="$2"
+            mkdir -p "$2"
+            OUTPUT_DIR="$(cd "$2" && pwd)"  # Convert to absolute path
             shift 2
             ;;
         -h|--help)
@@ -233,12 +356,39 @@ main() {
     for platform in "${platforms[@]}"; do
         if [[ -d "${PROJECT_ROOT}/${platform}" ]]; then
             if create_platform_packages "${platform}" "${package_types[@]}"; then
-                ((success_count++))
+                echo "✓ Successfully created packages for ${platform}"
+                success_count=$((success_count + 1))
+            else
+                echo "✗ Failed to create packages for ${platform}"
             fi
-            ((total_count++))
+            total_count=$((total_count + 1))
         else
             echo "Error: Platform directory not found: ${platform}"
         fi
+    done
+    
+    # Create policy package (only in publish mode)
+    if [[ "${PUBLISH_MODE}" == true ]]; then
+        echo ""
+        if create_policy_package "publish" "${version}"; then
+            echo "✓ Successfully created policy package"
+            success_count=$((success_count + 1))
+        else
+            echo "✗ Failed to create policy package"
+        fi
+        total_count=$((total_count + 1))
+    fi
+    
+    # Create deployment package
+    echo ""
+    for package_type in "${package_types[@]}"; do
+        if create_deployment_package "${package_type}" "${version}"; then
+            echo "✓ Successfully created deployment package"
+            success_count=$((success_count + 1))
+        else
+            echo "✗ Failed to create deployment package"
+        fi
+        total_count=$((total_count + 1))
     done
     
     echo ""
