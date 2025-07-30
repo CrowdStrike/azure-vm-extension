@@ -2,7 +2,7 @@
 set -euo pipefail
 
 readonly SERVICE_NAME="falcon-sensor.service"
-readonly VERSION="0.1.0"
+readonly VERSION="0.0.0"
 
 # Get the log folder path from HandlerEnvironment.json
 get_logs_folder() {

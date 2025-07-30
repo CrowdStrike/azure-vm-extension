@@ -132,7 +132,7 @@
     "extensionName": "FalconSensorWindows",
     "extensionPublisher": "CrowdStrike.Falcon",
     "extensionType": "FalconSensorWindows",
-    "extensionTypeHandlerVersion": "0.0.0.1"
+    "extensionTypeHandlerVersion": "0.0"
   },
   "resources": [
     {

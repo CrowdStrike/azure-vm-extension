@@ -97,7 +97,7 @@
     "extensionName": "FalconSensorLinux",
     "extensionPublisher": "CrowdStrike.Falcon",
     "extensionType": "FalconSensorLinux",
-    "extensionTypeHandlerVersion": "0.0.0.1"
+    "extensionTypeHandlerVersion": "0.0"
   },
   "resources": [
     {

@@ -25,7 +25,11 @@ param policyEffect string = 'DeployIfNotExists'
 @description('Create role assignments for policy managed identities (requires Owner or User Access Administrator role)')
 param createRoleAssignments bool = true
 
+@description('Handler version for the CrowdStrike Falcon extension')
+param handlerVersion string = '0.0'
 
+@description('Auto upgrade minor version for the CrowdStrike Falcon extension')
+param autoUpgradeMinorVersion bool = true
 
 // CrowdStrike Parameters
 @secure()
@@ -157,6 +161,22 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
         }
         defaultValue: ''
       }
+      handlerVersion: {
+        type: 'String'
+        metadata: {
+          displayName: 'Handler Version'
+          description: 'CrowdStrike Falcon extension handler version'
+        }
+        defaultValue: '0.0'
+      }
+      autoUpgradeMinorVersion: {
+        type: 'Boolean'
+        metadata: {
+          displayName: 'Auto Upgrade Minor Version'
+          description: 'Auto upgrade minor version for the CrowdStrike Falcon extension'
+        }
+        defaultValue: true
+      }
     }
     policyRule: {
       if: {
@@ -209,6 +229,8 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
                   proxyHost: { type: 'string' }
                   proxyPort: { type: 'string' }
                   tags: { type: 'string' }
+                  handlerVersion: { type: 'string' }
+                  autoUpgradeMinorVersion: { type: 'bool' }
                 }
                 resources: [
                   {
@@ -219,8 +241,8 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
                     properties: {
                       publisher: 'CrowdStrike.Falcon'
                       type: 'FalconSensorLinux'
-                      typeHandlerVersion: '0.0'
-                      autoUpgradeMinorVersion: true
+                      typeHandlerVersion: '[parameters(\'handlerVersion\')]'
+                      autoUpgradeMinorVersion: '[parameters(\'autoUpgradeMinorVersion\')]'
                       settings: {
                         cloud: '[parameters(\'cloud\')]'
                         member_cid: '[parameters(\'memberCid\')]'
@@ -276,6 +298,12 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
                 tags: {
                   value: '[parameters(\'tags\')]'
                 }
+                handlerVersion: {
+                  value: '[parameters(\'handlerVersion\')]'
+                }
+                autoUpgradeMinorVersion: {
+                  value: '[parameters(\'autoUpgradeMinorVersion\')]'
+                }
               }
             }
           }
@@ -329,6 +357,12 @@ resource linuxPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-0
       }
       tags: {
         value: tags
+      }
+      handlerVersion: {
+        value: handlerVersion
+      }
+      autoUpgradeMinorVersion: {
+        value: autoUpgradeMinorVersion
       }
     }
   }
@@ -478,6 +512,22 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
         }
         defaultValue: false
       }
+      handlerVersion: {
+        type: 'String'
+        metadata: {
+          displayName: 'Handler Version'
+          description: 'CrowdStrike Falcon extension handler version'
+        }
+        defaultValue: '0.0'
+      }
+      autoUpgradeMinorVersion: {
+        type: 'Boolean'
+        metadata: {
+          displayName: 'Auto Upgrade Minor Version'
+          description: 'Auto upgrade minor version for the CrowdStrike Falcon extension'
+        }
+        defaultValue: true
+      }
     }
     policyRule: {
       if: {
@@ -535,6 +585,8 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                   disableStart: { type: 'bool' }
                   provisioningWaitTime: { type: 'string' }
                   vdi: { type: 'bool' }
+                  handlerVersion: { type: 'string' }
+                  autoUpgradeMinorVersion: { type: 'bool' }
                 }
                 resources: [
                   {
@@ -545,8 +597,8 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                     properties: {
                       publisher: 'CrowdStrike.Falcon'
                       type: 'FalconSensorWindows'
-                      typeHandlerVersion: '0.0'
-                      autoUpgradeMinorVersion: true
+                      typeHandlerVersion: '[parameters(\'handlerVersion\')]'
+                      autoUpgradeMinorVersion: '[parameters(\'autoUpgradeMinorVersion\')]'
                       settings: {
                         cloud: '[parameters(\'cloud\')]'
                         member_cid: '[parameters(\'memberCid\')]'
@@ -622,6 +674,12 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                 vdi: {
                   value: '[parameters(\'vdi\')]'
                 }
+                handlerVersion: {
+                  value: '[parameters(\'handlerVersion\')]'
+                }
+                autoUpgradeMinorVersion: {
+                  value: '[parameters(\'autoUpgradeMinorVersion\')]'
+                }
               }
             }
           }
@@ -690,6 +748,12 @@ resource windowsPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020
       }
       vdi: {
         value: vdi
+      }
+      handlerVersion: {
+        value: handlerVersion
+      }
+      autoUpgradeMinorVersion: {
+        value: autoUpgradeMinorVersion
       }
     }
   }
