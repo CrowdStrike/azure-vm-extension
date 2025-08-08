@@ -83,6 +83,10 @@ az vm extension set \
   --vm-name myVM \
   --name FalconSensorLinux \
   --publisher Crowdstrike.Falcon \
+  --settings '{
+    "cloud": "autodiscover",
+    "tags": "azure,production"
+  }' \
   --protected-settings '{
     "client_id": "YOUR_CLIENT_ID",
     "client_secret": "YOUR_CLIENT_SECRET"
@@ -96,6 +100,10 @@ az vm extension set \
   --vm-name myVM \
   --name FalconSensorWindows \
   --publisher Crowdstrike.Falcon \
+  --settings '{
+    "cloud": "autodiscover",
+    "tags": "azure,production"
+  }' \
   --protected-settings '{
     "client_id": "YOUR_CLIENT_ID",
     "client_secret": "YOUR_CLIENT_SECRET"
@@ -121,32 +129,50 @@ For automated enterprise-scale deployment using Azure Policy, see the [Policy Te
 
 ## Configuration
 
-### Required Parameters
-| Parameter | Description |
-|-----------|-------------|
-| `client_id` | CrowdStrike API Client ID |
-| `client_secret` | CrowdStrike API Client Secret |
+The CrowdStrike Azure VM Extension uses two types of configuration parameters:
 
-### Optional Parameters
+- **Settings**: Non-sensitive configuration parameters passed as plain text
+- **Protected Settings**: Sensitive parameters (credentials, tokens) that are encrypted in transit and at rest
+
+> [!IMPORTANT]
+> Always place sensitive information like credentials and tokens in `protectedSettings` to ensure they are encrypted and secure.
+
+### Protected Settings (Sensitive Parameters)
+
+These parameters contain sensitive information and **must** be placed in the `protectedSettings` section:
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `client_id` | CrowdStrike API Client ID | Yes* |
+| `client_secret` | CrowdStrike API Client Secret | Yes* |
+| `access_token` | CrowdStrike API Access Token (alternative to client_id/client_secret) | Yes* |
+| `provisioning_token` | Installation token (if required by your environment) | No |
+
+*Either `client_id`/`client_secret` or `access_token` is required for authentication.
+
+### Settings (Non-Sensitive Parameters)
+
+These configuration parameters can be placed in the `settings` section:
+
+#### Common Settings (Linux and Windows)
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `cloud` | CrowdStrike cloud region (us-1, us-2, eu-1, us-gov-1) | Auto-detected |
-| `tags` | Comma-separated list of sensor tags | None |
+| `cloud` | CrowdStrike cloud region (us-1, us-2, eu-1, us-gov-1, autodiscover) | autodiscover |
+| `member_cid` | Member CID for MSSP scenarios | None |
 | `sensor_update_policy` | Sensor update policy name | platform_default |
-| `provisioning_token` | Installation token (if required) | None |
-
-### Windows-Specific Parameters
-| Parameter | Description | Default |
-|-----------|-------------|---------|
+| `tags` | Comma-separated list of sensor tags | None |
+| `disable_proxy` | Disable proxy settings | false |
 | `proxy_host` | HTTP proxy hostname | None |
 | `proxy_port` | HTTP proxy port | None |
-| `provisioning_wait_time` | Sensor provisioning timeout (ms) | 1200000 |
 
-### Linux-Specific Parameters
+#### Windows-Specific Settings
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `proxy_host` | HTTP proxy hostname | None |
-| `proxy_port` | HTTP proxy port | None |
+| `pac_url` | Proxy auto-configuration URL | None |
+| `disable_provisioning_wait` | Disable provisioning wait timeout | false |
+| `disable_start` | Prevent sensor from starting until reboot | false |
+| `provisioning_wait_time` | Provisioning timeout in milliseconds | 1200000 |
+| `vdi` | Enable virtual desktop infrastructure mode | false |
 
 ## Frequently Asked Questions (FAQs)
 
