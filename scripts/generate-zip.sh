@@ -38,7 +38,7 @@ EXAMPLES:
 
 This script creates zip packages from the handler and package directories:
     - Test mode: csfalcon-{platform}-handler-test-{version}.zip, csfalcon-deployment-test-{version}.zip
-    - Publish mode: csfalcon-{platform}-handler-{version}.zip, csfalcon-{platform}-ui-{version}.zip, csfalcon-azure-policy-{version}.zip, csfalcon-deployment-{version}.zip
+    - Publish mode: csfalcon-{platform}-handler-{version}.zip, csfalcon-{platform}-ui-{version}.zip, csfalcon-azure-policy-bicep.zip, csfalcon-deployment-{version}.zip
 EOF
 }
 
@@ -154,11 +154,10 @@ create_policy_package() {
     fi
     
     # Create zip file in output directory
-    local zip_suffix=""
+    local zip_name="csfalcon-azure-policy-bicep.zip"
     if [[ "${package_type}" == "test" ]]; then
-        zip_suffix="-test"
+        zip_name="csfalcon-azure-policy-bicep-test-${version}.zip"
     fi
-    local zip_name="csfalcon-azure-policy${zip_suffix}-${version}.zip"
     local zip_path="${OUTPUT_DIR}/${zip_name}"
     
     echo "Generating ${zip_name}..."
@@ -168,7 +167,7 @@ create_policy_package() {
         return 1
     }
     
-    if ! zip -r "${zip_path}" . -q; then
+    if ! zip -r "${zip_path}" . -x "ui*.json" -q; then
         echo "Error: Failed to create zip file: ${zip_path}"
         cd "${PROJECT_ROOT}"
         return 1

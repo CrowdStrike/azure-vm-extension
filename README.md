@@ -36,7 +36,7 @@ The extension follows Azure VM Extension standards with a handler-based architec
 
 ### Supported Linux Distributions
 
-See [https://falcon.crowdstrike.com/documentation/page/edd7717e/falcon-sensor-for-linux-system-requirements](https://falcon.crowdstrike.com/documentation/page/edd7717e/falcon-sensor-for-linux-system-requirements) for detailed support information and a complete list of:supported platforms:
+See [https://falcon.crowdstrike.com/documentation/page/edd7717e/falcon-sensor-for-linux-system-requirements](https://falcon.crowdstrike.com/documentation/page/edd7717e/falcon-sensor-for-linux-system-requirements) for detailed support information and a complete list of supported platforms:
 
 - Ubuntu LTS
 - Debian

@@ -237,7 +237,7 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
                     name: '[concat(parameters(\'vmName\'), \'/CrowdStrikeFalconSensor\')]'
                     type: 'Microsoft.Compute/virtualMachines/extensions'
                     location: '[parameters(\'location\')]'
-                    apiVersion: '2023-09-01'
+                    apiVersion: '2021-07-01'
                     properties: {
                       publisher: 'CrowdStrike.Falcon'
                       type: 'FalconSensorLinux'
@@ -593,7 +593,7 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                     name: '[concat(parameters(\'vmName\'), \'/CrowdStrikeFalconSensor\')]'
                     type: 'Microsoft.Compute/virtualMachines/extensions'
                     location: '[parameters(\'location\')]'
-                    apiVersion: '2023-09-01'
+                    apiVersion: '2021-07-01'
                     properties: {
                       publisher: 'CrowdStrike.Falcon'
                       type: 'FalconSensorWindows'

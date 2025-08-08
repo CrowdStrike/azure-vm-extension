@@ -8,6 +8,21 @@ This folder contains Azure Policy templates for automated deployment of CrowdStr
 - **`falcon-subscription.bicep`** - Creates policy definitions and assignments at subscription level
 - **`falcon-managementgroup.bicep`** - Creates policy assignments at management group level
 
+## Getting the Policy Templates
+
+### Download from GitHub Releases
+
+The Azure Policy templates are available as part of the official CrowdStrike Azure VM Extension releases:
+
+1. **Download Latest Release**: Download the latest release zip file containing the [Azure Policy Bicep templates](https://github.com/CrowdStrike/azure-vm-extension/releases/latest/download/csfalcon-azure-policy-bicep.zip)
+
+2. **Extract Policy Files**: Extract the zip file which contains:
+   - `falcon-subscription.bicep` - Subscription-level policy template
+   - `falcon-managementgroup.bicep` - Management group-level policy template
+   - `README.md` - This documentation
+
+3. **Use Templates**: Use the extracted `.bicep` files with Azure CLI or PowerShell as shown in the deployment examples below
+
 ## Features
 
 ### Core Functionality
@@ -144,13 +159,8 @@ New-AzManagementGroupDeployment `
 ## Prerequisites
 
 ### CrowdStrike API Credentials
-You need either:
-- **OAuth2 Client Credentials**: Client ID and Secret with appropriate permissions
-- **Access Token**: Valid API token
 
-### Required API Permissions
-- `Sensor Update Policy - Read`
-- `Sensor Update Policy - Write` (for uninstall operations)
+See https://github.com/CrowdStrike/azure-vm-extension?tab=readme-ov-file#falcon-api-permissions for specific Falcon API permissions required for deployment.
 
 ### Azure Permissions
 - `Microsoft.Authorization/policyDefinitions/write`

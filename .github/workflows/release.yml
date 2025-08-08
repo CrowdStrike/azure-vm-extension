@@ -105,7 +105,7 @@ jobs:
           dist/csfalcon-linux-ui-${{ steps.version.outputs.full_version }}.zip \
           dist/csfalcon-windows-handler-${{ steps.version.outputs.full_version }}.zip \
           dist/csfalcon-windows-ui-${{ steps.version.outputs.full_version }}.zip \
-          dist/csfalcon-azure-policy-${{ steps.version.outputs.full_version }}.zip \
+          dist/csfalcon-azure-policy-bicep.zip \
           dist/csfalcon-publish-extension-${{ steps.version.outputs.full_version }}.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -265,7 +265,7 @@
         },
         {
             "type": "Microsoft.Compute/virtualMachines/extensions",
-            "apiVersion": "2023-09-01",
+            "apiVersion": "2021-07-01",
             "name": "[concat(parameters('vmName'), '/CrowdstrikeFalconSensor')]",
             "location": "[parameters('location')]",
             "dependsOn": [
