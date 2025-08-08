@@ -211,7 +211,7 @@ generate_deployment() {
             type_name="FalconSensorLinux"
             label="CrowdStrike Falcon Sensor for Linux VM Extension"
             description="CrowdStrike Falcon Sensor for Linux provides real-time protection, detection, and response capabilities for Linux virtual machines, detecting advanced threats and stopping breaches."
-            media_link="https://publishvmextension.blob.core.windows.net/extensions/csfalcon-linuxextension-${VERSION}.zip"
+            media_link="https://publishvmextension.blob.core.windows.net/extensions/csfalcon-linux-handler-${VERSION}.zip"
         fi
     else # windows
         supported_os="Windows"
@@ -224,7 +224,7 @@ generate_deployment() {
             type_name="FalconSensorWindows"
             label="CrowdStrike Falcon Sensor for Windows VM Extension"
             description="CrowdStrike Falcon Sensor for Windows provides real-time protection, detection, and response capabilities for Windows virtual machines, detecting advanced threats and stopping breaches."
-            media_link="https://publishvmextension.blob.core.windows.net/extensions/csfalcon-windowsextension-${VERSION}.zip"
+            media_link="https://publishvmextension.blob.core.windows.net/extensions/csfalcon-windows-handler-${VERSION}.zip"
         fi
     fi
     
