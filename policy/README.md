@@ -6,7 +6,7 @@ This folder contains Azure Policy templates for automated deployment of CrowdStr
 
 ### Policy Templates
 - **`falcon-subscription.bicep`** - Creates policy definitions and assignments at subscription level
-- **`falcon-managementgroup.bicep`** - Creates policy assignments at management group level
+- **`falcon-managementgroup.bicep`** - Creates policy definitions and assignments at management group level
 
 ## Getting the Policy Templates
 
@@ -113,22 +113,24 @@ New-AzSubscriptionDeployment `
 
 ### Option 2: Management Group Level
 
-Deploy policy assignments at the management group level for enterprise-wide deployment.
+Deploy policies at the management group level for enterprise-wide deployment across multiple subscriptions.
 
 > [!IMPORTANT]
-> Requires existing policy definitions from subscription level deployment first.
+> The management group must already exist before deploying policies to it. Use `az account management-group create` to create a new management group if needed.
+
+#### Creating a Management Group (Optional)
+If you need to create a new management group first:
+
+```bash
+# Create a new management group
+az account management-group create \
+  --name "my-management-group" \
+  --display-name "My CrowdStrike Management Group"
+```
 
 #### Azure CLI
 ```bash
-# First, deploy subscription-level policies to create policy definitions
-az deployment sub create \
-  --location "East US" \
-  --template-file falcon-subscription.bicep \
-  --parameters \
-    clientId="your-client-id" \
-    clientSecret="your-client-secret"
-
-# Then deploy management group assignments
+# Deploy both Linux and Windows policies at management group level
 az deployment mg create \
   --management-group-id "my-management-group" \
   --location "East US" \
@@ -136,22 +138,55 @@ az deployment mg create \
   --parameters \
     clientId="your-client-id" \
     clientSecret="your-client-secret"
+
+# Deploy only Linux policy at management group level
+az deployment mg create \
+  --management-group-id "my-management-group" \
+  --location "East US" \
+  --template-file falcon-managementgroup.bicep \
+  --parameters \
+    operatingSystem="linux" \
+    clientId="your-client-id" \
+    clientSecret="your-client-secret" \
+    cloud="gov1"
+
+# Deploy only Windows policy at management group level
+az deployment mg create \
+  --management-group-id "my-management-group" \
+  --location "East US" \
+  --template-file falcon-managementgroup.bicep \
+  --parameters \
+    operatingSystem="windows" \
+    clientId="your-client-id" \
+    clientSecret="your-client-secret"
 ```
 
 #### PowerShell
 ```powershell
-# First, deploy subscription-level policies to create policy definitions
-New-AzSubscriptionDeployment `
-  -Location "East US" `
-  -TemplateFile "falcon-subscription.bicep" `
-  -clientId "your-client-id" `
-  -clientSecret "your-client-secret"
-
-# Then deploy management group assignments
+# Deploy both Linux and Windows policies at management group level
 New-AzManagementGroupDeployment `
   -ManagementGroupId "my-management-group" `
   -Location "East US" `
   -TemplateFile "falcon-managementgroup.bicep" `
+  -clientId "your-client-id" `
+  -clientSecret "your-client-secret"
+
+# Deploy only Linux policy at management group level
+New-AzManagementGroupDeployment `
+  -ManagementGroupId "my-management-group" `
+  -Location "East US" `
+  -TemplateFile "falcon-managementgroup.bicep" `
+  -operatingSystem "linux" `
+  -clientId "your-client-id" `
+  -clientSecret "your-client-secret" `
+  -cloud "gov1"
+
+# Deploy only Windows policy at management group level
+New-AzManagementGroupDeployment `
+  -ManagementGroupId "my-management-group" `
+  -Location "East US" `
+  -TemplateFile "falcon-managementgroup.bicep" `
+  -operatingSystem "windows" `
   -clientId "your-client-id" `
   -clientSecret "your-client-secret"
 ```
@@ -163,10 +198,26 @@ New-AzManagementGroupDeployment `
 See https://github.com/CrowdStrike/azure-vm-extension?tab=readme-ov-file#falcon-api-permissions for specific Falcon API permissions required for deployment.
 
 ### Azure Permissions
+
+**Recommended Azure Built-in Roles:**
+- **User Access Administrator** (for role assignments, if `createRoleAssignments=true`)
+
+> [!WARNING]
+> Management group deployments require elevated permissions compared to subscription deployments. Ensure your account has the appropriate roles assigned at the management group level before attempting deployment.
+
+#### For Subscription-Level Deployment
 - `Microsoft.Authorization/policyDefinitions/write`
 - `Microsoft.Authorization/policyAssignments/write`
 - `Microsoft.Authorization/roleAssignments/write`
 - `Microsoft.Compute/virtualMachines/extensions/write`
+
+#### For Management Group-Level Deployment
+- `Microsoft.Authorization/policyDefinitions/write` (at management group scope)
+- `Microsoft.Authorization/policyAssignments/write` (at management group scope)
+- `Microsoft.Authorization/roleAssignments/write` (at management group scope)
+- `Microsoft.Resources/deployments/validate/action` (at management group scope)
+- `Microsoft.Resources/deployments/write` (at management group scope)
+- `Microsoft.Compute/virtualMachines/extensions/write` (inherited by subscriptions)
 
 ## Parameters Reference
 

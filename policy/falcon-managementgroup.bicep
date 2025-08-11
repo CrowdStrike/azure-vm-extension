@@ -8,9 +8,6 @@ targetScope = 'managementGroup'
 ])
 param operatingSystem string = 'both'
 
-@description('Policy assignment name prefix')
-param policyAssignmentNamePrefix string = 'CS-Deploy-Falcon'
-
 @description('Policy definition name prefix')
 param policyDefinitionNamePrefix string = 'CS-Falcon-Policy'
 
@@ -315,7 +312,7 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
 
 // Create Linux policy assignment at management group level
 resource linuxPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'linux' || operatingSystemLower == 'both') {
-  name: '${policyAssignmentNamePrefix}-Linux-MG-${managementGroup().name}'
+  name: 'CS-Falcon-Linux-MG'
   location: deployment().location
   identity: {
     type: 'SystemAssigned'
@@ -691,7 +688,7 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
 
 // Create Windows policy assignment at management group level
 resource windowsPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'windows' || operatingSystemLower == 'both') {
-  name: '${policyAssignmentNamePrefix}-Windows-MG-${managementGroup().name}'
+  name: 'CS-Falcon-Win-MG'
   location: deployment().location
   identity: {
     type: 'SystemAssigned'
