@@ -205,8 +205,7 @@ See https://github.com/CrowdStrike/azure-vm-extension?tab=readme-ov-file#falcon-
 The templates create managed identities that need **Virtual Machine Contributor** role to deploy VM extensions.
 
 **If you have Owner or User Access Administrator role:**
-- Use default `createRoleAssignments=true`
-- Role assignments created automatically
+- By default, `createRoleAssignments=true` will create the necessary role assignments automatically. You do not need to take any additional action.
 
 **If you lack role assignment permissions:**
 - Set `createRoleAssignments=false`

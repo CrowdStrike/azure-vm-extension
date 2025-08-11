@@ -20,7 +20,7 @@ param policyDefinitionNamePrefix string = 'CS-Falcon-Policy'
 param policyEffect string = 'DeployIfNotExists'
 
 @description('Create role assignments for policy managed identities (requires Owner or User Access Administrator role)')
-param createRoleAssignments bool = false
+param createRoleAssignments bool = true
 
 @description('Handler version for the CrowdStrike Falcon extension')
 param handlerVersion string = '0.0'
