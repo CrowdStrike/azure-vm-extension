@@ -117,6 +117,71 @@ az vm extension set \
 4. Select the appropriate extension (Linux or Windows)
 5. Configure the required parameters and install
 
+### Using Azure Key Vault with ARM Templates
+
+For enhanced security, store sensitive CrowdStrike API credentials in Azure Key Vault rather than directly in ARM templates. This ensures credentials are encrypted, access-controlled, and auditable.
+
+#### Azure Vault Setup
+
+Follow the [Azure Key Vault documentation](https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/key-vault-parameter) to create a Key Vault and store your CrowdStrike API credentials as secrets.
+
+#### ARM Template Integration
+
+Store your CrowdStrike API credentials in Key Vault as secrets. You can use any secret names you prefer - the examples below use:
+- `FalconClientId` - Your CrowdStrike API Client ID
+- `FalconClientSecret` - Your CrowdStrike API Client Secret
+
+##### Example Using Key Vault References in an ARM template
+
+Example of parameters file with Key Vault references:
+```json
+{
+    "parameters": {
+        "falconClientId": {
+            "reference": {
+                "keyVault": {
+                    "id": "/subscriptions/{subscription-id}/resourceGroups/{rg-name}/providers/Microsoft.KeyVault/vaults/{vault-name}"
+                },
+                "secretName": "FalconClientId"
+            }
+        },
+        "falconClientSecret": {
+            "reference": {
+                "keyVault": {
+                    "id": "/subscriptions/{subscription-id}/resourceGroups/{rg-name}/providers/Microsoft.KeyVault/vaults/{vault-name}"
+                },
+                "secretName": "FalconClientSecret"
+            }
+        }
+    }
+}
+```
+
+Example of ARM template deployment with inline parameters:
+```json
+{
+    "type": "Microsoft.Compute/virtualMachines/extensions",
+    "apiVersion": "2021-07-01",
+    "name": "[concat(parameters('vmName'), '/', variables('extensionName'))]",
+    "location": "[parameters('location')]",
+    "dependsOn": [
+        "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
+    ],
+    "properties": {
+        "publisher": "[variables('extensionPublisher')]",
+        "type": "[variables('extensionType')]",
+        "typeHandlerVersion": "[variables('extensionTypeHandlerVersion')]",
+        "autoUpgradeMinorVersion": true,
+        "protectedSettings": {
+            "client_id": "[parameters('falconClientId')]",
+            "client_secret": "[parameters('falconClientSecret')]"
+        }
+    }
+}
+```
+
+The deployment identity must have `Get` permissions on the Key Vault secrets for the deployment to succeed.
+
 ### Azure Policy
 
 For automated enterprise-scale deployment using Azure Policy, see the [Policy Templates](policy/README.md) documentation for detailed instructions on deploying CrowdStrike Falcon at scale using Azure Policy. The templates support both subscription and management group level assignments, with automatic detection of Windows and Linux VMs.
