@@ -72,6 +72,53 @@ The extension can be deployed through:
 - **Azure Resource Manager templates** - Infrastructure as Code
 - **Azure Policy** - Enterprise-scale automated deployment (see [Policy Templates](policy/README.md))
 
+## Configuration
+
+The CrowdStrike Azure VM Extension uses two types of configuration parameters:
+
+- **Settings**: Non-sensitive configuration parameters passed as plain text
+- **Protected Settings**: Sensitive parameters (credentials, tokens) that are encrypted in transit and at rest
+
+> [!IMPORTANT]
+> Always place sensitive information like credentials and tokens in `protectedSettings` to ensure they are encrypted and secure.
+
+### Protected Settings (Sensitive Parameters)
+
+These parameters contain sensitive information and **must** be placed in the `protectedSettings` section:
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `client_id` | CrowdStrike API Client ID | Yes* |
+| `client_secret` | CrowdStrike API Client Secret | Yes* |
+| `access_token` | CrowdStrike API Access Token (alternative to client_id/client_secret) | Yes* |
+| `provisioning_token` | Installation token (if required by your environment) | No |
+
+*Either `client_id`/`client_secret` or `access_token` is required for authentication.
+
+### Settings (Non-Sensitive Parameters)
+
+These configuration parameters can be placed in the `settings` section:
+
+#### Common Settings (Linux and Windows)
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `cloud` | CrowdStrike cloud region (us-1, us-2, eu-1, us-gov-1, autodiscover) | autodiscover |
+| `member_cid` | Member CID for MSSP scenarios | None |
+| `sensor_update_policy` | Sensor update policy name | platform_default |
+| `tags` | Comma-separated list of sensor tags | None |
+| `disable_proxy` | Disable proxy settings | false |
+| `proxy_host` | HTTP proxy hostname | None |
+| `proxy_port` | HTTP proxy port | None |
+
+#### Windows-Specific Settings
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `pac_url` | Proxy auto-configuration URL | None |
+| `disable_provisioning_wait` | Disable provisioning wait timeout | false |
+| `disable_start` | Prevent sensor from starting until reboot | false |
+| `provisioning_wait_time` | Provisioning timeout in milliseconds | 1200000 |
+| `vdi` | Enable virtual desktop infrastructure mode | false |
+
 ## Usage
 
 ### Azure CLI
@@ -192,56 +239,27 @@ For automated enterprise-scale deployment using Azure Policy, see the [Policy Te
 - **[Testing Guide](tests/TESTING.md)** - Information about the testing framework
 - **[Policy Templates](policy/README.md)** - Azure Policy deployment guide for enterprise-scale deployment
 
-## Configuration
+## Troubleshooting
 
-The CrowdStrike Azure VM Extension uses two types of configuration parameters:
+If you encounter any issues during the extension deployment process, the following logs will be generated on the VMs:
 
-- **Settings**: Non-sensitive configuration parameters passed as plain text
-- **Protected Settings**: Sensitive parameters (credentials, tokens) that are encrypted in transit and at rest
+- **`cshandler.log`**: This log file captures the standard output and error information from the extension handler operations (install, enable, disable, uninstall, update).
+- **`CommandExecution.log`**: This log file contains detailed information about command execution during the extension operations.
+- **`falcon-installer.log`**: This log file contains detailed information about the Falcon sensor installation process. It includes messages about the progress of the installation, any errors encountered, and other relevant details.
+
+These logs can be found under `/var/log/azure/Crowdstrike.Falcon.FalconSensorLinux/` for Linux VMs and `C:\WindowsAzure\Logs\Plugins\Crowdstrike.Falcon.FalconSensorWindows\<version>\` for Windows VMs.
+
+The extension handler working directory (which includes downloaded installer files, configuration, and status files) can be found under `/var/lib/waagent/Crowdstrike.Falcon.FalconSensorLinux-<version>/` for Linux VMs and `C:\Packages\Plugins\Crowdstrike.Falcon.FalconSensorWindows\<version>\` for Windows VMs.
+
+In addition to the VM logs, you can also check the extension status and configuration through the Azure portal or Azure CLI:
+
+- Check extension status in Azure portal under VM → Extensions + applications
+- Use Azure CLI: `az vm extension show --resource-group <rg> --vm-name <vm> --name FalconSensorLinux` (or `FalconSensorWindows`)
+
+Review these logs for failures as to why the installation and deployment failed. When contacting CrowdStrike support or creating a GitHub issue, these logs should be provided.
 
 > [!IMPORTANT]
-> Always place sensitive information like credentials and tokens in `protectedSettings` to ensure they are encrypted and secure.
-
-### Protected Settings (Sensitive Parameters)
-
-These parameters contain sensitive information and **must** be placed in the `protectedSettings` section:
-
-| Parameter | Description | Required |
-|-----------|-------------|----------|
-| `client_id` | CrowdStrike API Client ID | Yes* |
-| `client_secret` | CrowdStrike API Client Secret | Yes* |
-| `access_token` | CrowdStrike API Access Token (alternative to client_id/client_secret) | Yes* |
-| `provisioning_token` | Installation token (if required by your environment) | No |
-
-*Either `client_id`/`client_secret` or `access_token` is required for authentication.
-
-### Settings (Non-Sensitive Parameters)
-
-These configuration parameters can be placed in the `settings` section:
-
-#### Common Settings (Linux and Windows)
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `cloud` | CrowdStrike cloud region (us-1, us-2, eu-1, us-gov-1, autodiscover) | autodiscover |
-| `member_cid` | Member CID for MSSP scenarios | None |
-| `sensor_update_policy` | Sensor update policy name | platform_default |
-| `tags` | Comma-separated list of sensor tags | None |
-| `disable_proxy` | Disable proxy settings | false |
-| `proxy_host` | HTTP proxy hostname | None |
-| `proxy_port` | HTTP proxy port | None |
-
-#### Windows-Specific Settings
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `pac_url` | Proxy auto-configuration URL | None |
-| `disable_provisioning_wait` | Disable provisioning wait timeout | false |
-| `disable_start` | Prevent sensor from starting until reboot | false |
-| `provisioning_wait_time` | Provisioning timeout in milliseconds | 1200000 |
-| `vdi` | Enable virtual desktop infrastructure mode | false |
-
-## Frequently Asked Questions (FAQs)
-
-Have additional questions about the extension? Check out our [FAQ documentation](docs/faq.md) for more information. If your question is not answered in the FAQ doc, feel free to [open a discussion](https://github.com/CrowdStrike/azure-vm-extension/discussions) in our GitHub repository.
+> When providing logs, please make sure to sanitize the output and do not provide any credentials or sensitive information.
 
 ## Contributing
 
