@@ -67,7 +67,6 @@ Ensure the following API scopes are enabled:
 ## Installation
 
 The extension can be deployed through:
-- **Azure Portal** - Individual VM deployment
 - **Azure CLI** - Command-line deployment
 - **Azure Resource Manager templates** - Infrastructure as Code
 - **Azure Policy** - Enterprise-scale automated deployment (see [Policy Templates](policy/README.md))
@@ -156,13 +155,6 @@ az vm extension set \
     "client_secret": "YOUR_CLIENT_SECRET"
   }'
 ```
-
-### Azure Portal
-1. Navigate to your virtual machine in the Azure Portal
-2. Select "Extensions + applications" from the left menu
-3. Click "Add" and search for "CrowdStrike Falcon"
-4. Select the appropriate extension (Linux or Windows)
-5. Configure the required parameters and install
 
 ### Using Azure Key Vault with ARM Templates
 
