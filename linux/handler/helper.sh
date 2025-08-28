@@ -10,13 +10,13 @@ get_logs_folder() {
 }
 
 # Logging function
-log() { 
+log() {
     local level="$1"
     local message="$2"
     local timestamp=$(date --utc --iso-8601=seconds)
 
     get_logs_folder
-    
+
     echo "[$timestamp] $level $message"
     echo "[$timestamp] $level $message" >> "$LOGS_FOLDER/cshandler.log"
 }
@@ -24,7 +24,7 @@ log() {
 # Detect system architecture
 detect_architecture() {
     ARCH=$(uname -m)
-    
+
     if [ "$ARCH" = "aarch64" ]; then
         ARCH_SUFFIX="arm64"
     elif [ "$ARCH" = "x86_64" ]; then
@@ -59,6 +59,29 @@ get_status_folder() {
     STATUS_FOLDER=$(cat HandlerEnvironment.json | grep -o '"statusFolder": "[^"]*"' | cut -d'"' -f4)
 }
 
+# Parse proxy configuration from config file
+get_proxy_config() {
+    PROXY_HOST=""
+    PROXY_PORT=""
+    HTTPS_PROXY=""
+
+    if [ -f "$CONFIG_FILE" ]; then
+        # Extract proxy_host and proxy_port from settings
+        PROXY_HOST=$(cat "$CONFIG_FILE" | grep -o '"proxy_host": *"[^"]*"' | cut -d'"' -f4 | head -1 || true)
+        PROXY_PORT=$(cat "$CONFIG_FILE" | grep -o '"proxy_port": *"[^"]*"' | cut -d'"' -f4 | head -1 || true)
+
+        # Construct HTTPS_PROXY - proxy_host is required, proxy_port is optional
+        if [ ! -z "$PROXY_HOST" ]; then
+            if [ ! -z "$PROXY_PORT" ]; then
+                HTTPS_PROXY="$PROXY_HOST:$PROXY_PORT"
+            else
+                HTTPS_PROXY="$PROXY_HOST"
+            fi
+            log "INFO" "Proxy configuration found: $HTTPS_PROXY"
+        fi
+    fi
+}
+
 # Set the status of the VM Extension
 set_status() {
     local name="${1}"
@@ -71,8 +94,8 @@ set_status() {
     local timestamp=$(date --utc --iso-8601=seconds)
     local statusNum="0"
     local code=0
-    
-    # Get the status folder path 
+
+    # Get the status folder path
     get_status_folder
 
     local status_file="$STATUS_FOLDER/$statusNum.status"
@@ -115,34 +138,47 @@ run_falcon_installer() {
     local operation="$1"
     local operation_upper="${operation^^}"  # Convert to uppercase
     local logs_dir="${2:-$script_path/falcon}"  # Default to $script_path/falcon if not provided
-    
+
     # Detect architecture and set installer
     detect_architecture
 
     # Get Config file
     get_config_file
 
+    # Get proxy configuration
+    get_proxy_config
+
     if [ ! -d "$logs_dir" ]; then
         mkdir -p "$logs_dir"
     fi
-    
+
     # Run the installer with appropriate parameters
     if [ "$operation" = "uninstall" ]; then
         log "INFO" "[$operation_upper] running the Falcon installer to remove the Falcon sensor..."
-        { installer_output=$(sudo "$script_path/$INSTALLER" --uninstall --verbose --enable-file-logging --user-agent="azure-vm-extension/$VERSION" --tmpdir "$logs_dir" --config "$CONFIG_FILE" 2>"$logs_dir/falcon-installer.log"); installer_exit_code=$?; } || true
+        if [ ! -z "$HTTPS_PROXY" ]; then
+            log "INFO" "[$operation_upper] Using proxy configuration: $HTTPS_PROXY"
+            { installer_output=$(sudo HTTPS_PROXY="$HTTPS_PROXY" "$script_path/$INSTALLER" --uninstall --verbose --enable-file-logging --user-agent="azure-vm-extension/$VERSION" --tmpdir "$logs_dir" --config "$CONFIG_FILE" 2>"$logs_dir/falcon-installer.log"); installer_exit_code=$?; } || true
+        else
+            { installer_output=$(sudo "$script_path/$INSTALLER" --uninstall --verbose --enable-file-logging --user-agent="azure-vm-extension/$VERSION" --tmpdir "$logs_dir" --config "$CONFIG_FILE" 2>"$logs_dir/falcon-installer.log"); installer_exit_code=$?; } || true
+        fi
     else
         log "INFO" "[$operation_upper] running the Falcon installer..."
-        { installer_output=$(sudo "$script_path/$INSTALLER" --verbose --enable-file-logging --user-agent="azure-vm-extension/$VERSION" --tmpdir "$logs_dir" --config "$CONFIG_FILE" 2>"$logs_dir/falcon-installer.log"); installer_exit_code=$?; } || true
+        if [ ! -z "$HTTPS_PROXY" ]; then
+            log "INFO" "[$operation_upper] Using proxy configuration: $HTTPS_PROXY"
+            { installer_output=$(sudo HTTPS_PROXY="$HTTPS_PROXY" "$script_path/$INSTALLER" --verbose --enable-file-logging --user-agent="azure-vm-extension/$VERSION" --tmpdir "$logs_dir" --config "$CONFIG_FILE" 2>"$logs_dir/falcon-installer.log"); installer_exit_code=$?; } || true
+        else
+            { installer_output=$(sudo "$script_path/$INSTALLER" --verbose --enable-file-logging --user-agent="azure-vm-extension/$VERSION" --tmpdir "$logs_dir" --config "$CONFIG_FILE" 2>"$logs_dir/falcon-installer.log"); installer_exit_code=$?; } || true
+        fi
     fi
-    
+
     if [ $installer_exit_code -eq 0 ]; then
         # Set success message based on operation
         local success_message="Falcon Sensor $([ "$operation" = "uninstall" ] && echo "uninstall" || echo "installation") process completed"
         local operation_capitalized="$(tr '[:lower:]' '[:upper:]' <<< ${operation:0:1})${operation:1}"
         local operation_gerund="$([ "$operation" = "uninstall" ] && echo "Uninstalling" || echo "Installing")"
-       
+
         log "INFO" "[$operation_upper] $success_message"
-       
+
         set_status "$operation_capitalized" "$operation_gerund the Falcon Sensor" "success" \
                   "The $success_message" "Falcon Sensor" "success" "The $success_message"
         return 0
@@ -151,9 +187,9 @@ run_falcon_installer() {
         local error_message="The Falcon Sensor $([ "$operation" = "uninstall" ] && echo "uninstall" || echo "install") failed to complete."
         local operation_capitalized="$(tr '[:lower:]' '[:upper:]' <<< ${operation:0:1})${operation:1}"
         local operation_gerund="$([ "$operation" = "uninstall" ] && echo "Uninstalling" || echo "Installing")"
-        
+
         log "ERROR" "[$operation_upper] $error_message Please see '$logs_dir/falcon-installer.log' for more info."
-        
+
         set_status "$operation_capitalized" "$operation_gerund the Falcon Sensor" "failed" \
                   "$error_message" "Falcon Sensor" "error" \
                   "$error_message Please see '$logs_dir/falcon-installer.log' for more info."
