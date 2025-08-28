@@ -71,6 +71,13 @@
         "description": "The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token"
       }
     },
+    "azure-vault-name": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure Key Vault name for retrieving CrowdStrike API credentials"
+      }
+    },
     "proxy-host": {
       "type": "string",
       "defaultValue": "",
@@ -123,7 +130,8 @@
           "access-token": "[parameters('access-token')]",
           "client-id": "[parameters('client-id')]",
           "client-secret": "[parameters('client-secret')]",
-          "provisioning-token": "[parameters('provisioning-token')]"
+          "provisioning-token": "[parameters('provisioning-token')]",
+          "azure-vault-name": "[parameters('azure-vault-name')]"
         }
       }
     }

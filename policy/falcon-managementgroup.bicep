@@ -33,6 +33,10 @@ param autoUpgradeMinorVersion bool = true
 param clientId string = ''
 @secure()
 param clientSecret string = ''
+@secure()
+param accessToken string = ''
+@secure()
+param azureVaultName string = ''
 param cloud string = 'autodiscover'
 param memberCid string = ''
 param sensorUpdatePolicy string = 'platform_default'
@@ -93,6 +97,22 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
           displayName: 'CrowdStrike Client Secret'
           description: 'CrowdStrike API Client Secret'
         }
+      }
+      accessToken: {
+        type: 'String'
+        metadata: {
+          displayName: 'CrowdStrike Access Token'
+          description: 'CrowdStrike API Access Token'
+        }
+        defaultValue: ''
+      }
+      azureVaultName: {
+        type: 'String'
+        metadata: {
+          displayName: 'Azure Key Vault Name'
+          description: 'Azure Key Vault name containing CrowdStrike credentials'
+        }
+        defaultValue: ''
       }
       cloud: {
         type: 'String'
@@ -218,6 +238,8 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
                   location: { type: 'string' }
                   clientId: { type: 'securestring' }
                   clientSecret: { type: 'securestring' }
+                  accessToken: { type: 'securestring' }
+                  azureVaultName: { type: 'securestring' }
                   cloud: { type: 'string' }
                   memberCid: { type: 'string' }
                   sensorUpdatePolicy: { type: 'string' }
@@ -252,6 +274,8 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
                       protectedSettings: {
                         client_id: '[parameters(\'clientId\')]'
                         client_secret: '[parameters(\'clientSecret\')]'
+                        access_token: '[parameters(\'accessToken\')]'
+                        azure_vault_name: '[parameters(\'azureVaultName\')]'
                         provisioning_token: '[parameters(\'provisioningToken\')]'
                       }
                     }
@@ -270,6 +294,12 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
                 }
                 clientSecret: {
                   value: '[parameters(\'clientSecret\')]'
+                }
+                accessToken: {
+                  value: '[parameters(\'accessToken\')]'
+                }
+                azureVaultName: {
+                  value: '[parameters(\'azureVaultName\')]'
                 }
                 cloud: {
                   value: '[parameters(\'cloud\')]'
@@ -330,6 +360,12 @@ resource linuxPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-0
       }
       clientSecret: {
         value: clientSecret
+      }
+      accessToken: {
+        value: accessToken
+      }
+      azureVaultName: {
+        value: azureVaultName
       }
       cloud: {
         value: cloud
@@ -404,6 +440,22 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
           displayName: 'CrowdStrike Client Secret'
           description: 'CrowdStrike API Client Secret'
         }
+      }
+      accessToken: {
+        type: 'String'
+        metadata: {
+          displayName: 'CrowdStrike Access Token'
+          description: 'CrowdStrike API Access Token'
+        }
+        defaultValue: ''
+      }
+      azureVaultName: {
+        type: 'String'
+        metadata: {
+          displayName: 'Azure Key Vault Name'
+          description: 'Azure Key Vault name containing CrowdStrike credentials'
+        }
+        defaultValue: ''
       }
       cloud: {
         type: 'String'
@@ -569,6 +621,8 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                   location: { type: 'string' }
                   clientId: { type: 'securestring' }
                   clientSecret: { type: 'securestring' }
+                  accessToken: { type: 'securestring' }
+                  azureVaultName: { type: 'securestring' }
                   cloud: { type: 'string' }
                   memberCid: { type: 'string' }
                   sensorUpdatePolicy: { type: 'string' }
@@ -613,6 +667,8 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                       protectedSettings: {
                         client_id: '[parameters(\'clientId\')]'
                         client_secret: '[parameters(\'clientSecret\')]'
+                        access_token: '[parameters(\'accessToken\')]'
+                        azure_vault_name: '[parameters(\'azureVaultName\')]'
                         provisioning_token: '[parameters(\'provisioningToken\')]'
                       }
                     }
@@ -631,6 +687,12 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                 }
                 clientSecret: {
                   value: '[parameters(\'clientSecret\')]'
+                }
+                accessToken: {
+                  value: '[parameters(\'accessToken\')]'
+                }
+                azureVaultName: {
+                  value: '[parameters(\'azureVaultName\')]'
                 }
                 cloud: {
                   value: '[parameters(\'cloud\')]'
@@ -706,6 +768,12 @@ resource windowsPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020
       }
       clientSecret: {
         value: clientSecret
+      }
+      accessToken: {
+        value: accessToken
+      }
+      azureVaultName: {
+        value: azureVaultName
       }
       cloud: {
         value: cloud

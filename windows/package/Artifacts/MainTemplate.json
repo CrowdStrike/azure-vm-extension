@@ -126,6 +126,13 @@
       "metadata": {
         "description": "Enable virtual desktop infrastructure mode"
       }
+    },
+    "azure-vault-name": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure Key Vault name for retrieving CrowdStrike API credentials"
+      }
     }
   },
   "variables": {
@@ -163,7 +170,8 @@
           "access-token": "[parameters('access-token')]",
           "client-id": "[parameters('client-id')]",
           "client-secret": "[parameters('client-secret')]",
-          "provisioning-token": "[parameters('provisioning-token')]"
+          "provisioning-token": "[parameters('provisioning-token')]",
+          "azure-vault-name": "[parameters('azure-vault-name')]"
         }
       }
     }

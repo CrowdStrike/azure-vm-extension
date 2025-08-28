@@ -90,9 +90,21 @@ These parameters contain sensitive information and **must** be placed in the `pr
 | `client_id` | CrowdStrike API Client ID | Yes* |
 | `client_secret` | CrowdStrike API Client Secret | Yes* |
 | `access_token` | CrowdStrike API Access Token (alternative to client_id/client_secret) | Yes* |
+| `azure_vault_name` | Azure Key Vault name containing CrowdStrike credentials | Yes* |
 | `provisioning_token` | Installation token (if required by your environment) | No |
 
-*Either `client_id`/`client_secret` or `access_token` is required for authentication.
+*One of the following authentication methods is required:
+- `client_id` + `client_secret` (OAuth2 credentials)
+- `access_token` (direct API access token)
+- `azure_vault_name` (Azure Key Vault integration)
+
+> [!IMPORTANT]
+> When specifying the Azure vault with `azure_vault_name`, make sure that all VMs have the appropriate permissions to list and get the Key Vault secrets.
+> The extension will fail to install if the VM doesn't have the required permissions to access the secrets.
+> Any secrets in the vault should be prefixed with `FALCON-` e.g. FALCON-CLIENT-ID, FALCON-CLIENT-SECRET, FALCON-ACCESS-TOKEN, etc.
+>
+> If you choose to use Azure Key Vault with ARM templates, you do not have to specify `azure_vault_name` or give VMs access to the vault.
+> See [Using Key Vault with ARM Templates](#using-azure-key-vault-with-arm-templates) for details on using Key Vault with ARM templates.
 
 ### Settings (Non-Sensitive Parameters)
 
@@ -219,7 +231,7 @@ Example of ARM template deployment with inline parameters:
 }
 ```
 
-The deployment identity must have `Get` permissions on the Key Vault secrets for the deployment to succeed.
+Make sure to enable `Azure Resource Manager for template deployment` in your Azure Vault settings to allow the ARM template to access your Vault secrets.
 
 ### Azure Policy
 

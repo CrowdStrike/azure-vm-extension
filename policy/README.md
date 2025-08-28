@@ -39,6 +39,7 @@ The Azure Policy templates are available as part of the official CrowdStrike Azu
 ### Authentication Methods
 - **OAuth2 Client Credentials**: Recommended method using Client ID and Secret
 - **Access Token**: Direct API token authentication
+- **Azure Key Vault**: Secure credential storage using Azure Key Vault integration
 
 ### Configuration Options
 - **Falcon Cloud**: Auto-discover, US-1, US-2, EU-1, US-GOV-1
@@ -227,12 +228,18 @@ See https://github.com/CrowdStrike/azure-vm-extension?tab=readme-ov-file#falcon-
 | `clientId` | string | OAuth2 Client ID | '' |
 | `clientSecret` | securestring | OAuth2 Client Secret | '' |
 | `accessToken` | securestring | API Access Token | '' |
+| `azureVaultName` | securestring | Azure Key Vault name containing CrowdStrike credentials | '' |
 | `cloud` | string | Falcon Cloud (us-1, us-2, eu-1, us-gov-1) | 'autodiscover' |
 | `memberCid` | string | Member CID for MSSP | '' |
 | `sensorUpdatePolicy` | string | Sensor update policy name | 'platform_default' |
 | `tags` | string | Comma-separated sensor tags | '' |
 | `policyEffect` | string | Policy effect | 'DeployIfNotExists' |
 | `createRoleAssignments` | bool | Create role assignments for managed identities | true |
+
+> [!IMPORTANT]
+> When specifying the Azure vault with `azure_vault_name`, make sure that all VMs have the appropriate permissions to list and get the Key Vault secrets.
+> The extension will fail to install if the VM doesn't have the required permissions to access the secrets.
+> Any secrets in the vault should be prefixed with `FALCON-` e.g. FALCON-CLIENT-ID, FALCON-CLIENT-SECRET, FALCON-ACCESS-TOKEN, etc.
 
 ### Windows-Specific Parameters
 | Parameter | Type | Description | Default |

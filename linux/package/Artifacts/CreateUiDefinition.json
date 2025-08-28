@@ -29,6 +29,10 @@
                     {
                       "label": "Access Token",
                       "value": "accessToken"
+                    },
+                    {
+                      "label": "Azure Key Vault",
+                      "value": "vault"
                     }
                   ],
                   "required": true
@@ -80,6 +84,18 @@
                   "hideConfirmation": true
                 },
                 "visible": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'accessToken')]"
+              },
+              {
+                "name": "azureVaultName",
+                "type": "Microsoft.Common.TextBox",
+                "label": "Azure Key Vault Name",
+                "toolTip": "Azure Key Vault name for retrieving CrowdStrike API credentials",
+                "constraints": {
+                  "required": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'vault')]",
+                  "regex": "^[a-zA-Z0-9-]*$",
+                  "validationMessage": "Key Vault name can only contain letters, numbers, and hyphens"
+                },
+                "visible": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'vault')]"
               },
               {
                 "name": "memberCid",
@@ -232,6 +248,7 @@
       "access-token": "[steps('falconApiConfig').apiAuthSection.accessToken]",
       "client-id": "[steps('falconApiConfig').apiAuthSection.clientId]",
       "client-secret": "[steps('falconApiConfig').apiAuthSection.clientSecret]",
+      "azure-vault-name": "[steps('falconApiConfig').apiAuthSection.azureVaultName]",
       "cloud": "[steps('falconApiConfig').cloudSection.cloud]",
       "member-cid": "[steps('falconApiConfig').apiAuthSection.memberCid]",
       "sensor-update-policy": "[steps('sensorConfig').sensorVersionSection.sensorUpdatePolicy]",

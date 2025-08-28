@@ -35,6 +35,8 @@ param clientId string = ''
 param clientSecret string = ''
 @secure()
 param accessToken string = ''
+@secure()
+param azureVaultName string = ''
 param cloud string = 'autodiscover'
 param memberCid string = ''
 param sensorUpdatePolicy string = 'platform_default'
@@ -102,6 +104,14 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
           displayName: 'CrowdStrike Access Token'
           description: 'CrowdStrike API Access Token'
         }
+      }
+      azureVaultName: {
+        type: 'String'
+        metadata: {
+          displayName: 'Azure Key Vault Name'
+          description: 'Azure Key Vault name for credential storage'
+        }
+        defaultValue: ''
       }
       cloud: {
         type: 'String'
@@ -228,6 +238,7 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
                   clientId: { type: 'securestring' }
                   clientSecret: { type: 'securestring' }
                   accessToken: { type: 'securestring' }
+                  azureVaultName: { type: 'securestring' }
                   cloud: { type: 'string' }
                   memberCid: { type: 'string' }
                   sensorUpdatePolicy: { type: 'string' }
@@ -263,6 +274,7 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
                         client_id: '[parameters(\'clientId\')]'
                         client_secret: '[parameters(\'clientSecret\')]'
                         access_token: '[parameters(\'accessToken\')]'
+                        azure_vault_name: '[parameters(\'azureVaultName\')]'
                         provisioning_token: '[parameters(\'provisioningToken\')]'
                       }
                     }
@@ -284,6 +296,9 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
                 }
                 accessToken: {
                   value: '[parameters(\'accessToken\')]'
+                }
+                azureVaultName: {
+                  value: '[parameters(\'azureVaultName\')]'
                 }
                 cloud: {
                   value: '[parameters(\'cloud\')]'
@@ -347,6 +362,9 @@ resource linuxPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-0
       }
       accessToken: {
         value: accessToken
+      }
+      azureVaultName: {
+        value: azureVaultName
       }
       cloud: {
         value: cloud
@@ -428,6 +446,14 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
           displayName: 'CrowdStrike Access Token'
           description: 'CrowdStrike API Access Token'
         }
+      }
+      azureVaultName: {
+        type: 'String'
+        metadata: {
+          displayName: 'Azure Key Vault Name'
+          description: 'Azure Key Vault name for credential storage'
+        }
+        defaultValue: ''
       }
       cloud: {
         type: 'String'
@@ -594,6 +620,7 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                   clientId: { type: 'securestring' }
                   clientSecret: { type: 'securestring' }
                   accessToken: { type: 'securestring' }
+                  azureVaultName: { type: 'securestring' }
                   cloud: { type: 'string' }
                   memberCid: { type: 'string' }
                   sensorUpdatePolicy: { type: 'string' }
@@ -639,6 +666,7 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                         client_id: '[parameters(\'clientId\')]'
                         client_secret: '[parameters(\'clientSecret\')]'
                         access_token: '[parameters(\'accessToken\')]'
+                        azure_vault_name: '[parameters(\'azureVaultName\')]'
                         provisioning_token: '[parameters(\'provisioningToken\')]'
                       }
                     }
@@ -660,6 +688,9 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                 }
                 accessToken: {
                   value: '[parameters(\'accessToken\')]'
+                }
+                azureVaultName: {
+                  value: '[parameters(\'azureVaultName\')]'
                 }
                 cloud: {
                   value: '[parameters(\'cloud\')]'
@@ -738,6 +769,9 @@ resource windowsPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020
       }
       accessToken: {
         value: accessToken
+      }
+      azureVaultName: {
+        value: azureVaultName
       }
       cloud: {
         value: cloud
