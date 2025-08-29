@@ -102,7 +102,7 @@
   },
   "variables": {
     "extensionName": "FalconSensorLinux",
-    "extensionPublisher": "CrowdStrike.Falcon",
+    "extensionPublisher": "Crowdstrike.Falcon",
     "extensionType": "FalconSensorLinux",
     "extensionTypeHandlerVersion": "0.0"
   },

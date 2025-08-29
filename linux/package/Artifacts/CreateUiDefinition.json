@@ -1,262 +1,250 @@
 {
-  "$schema": "https://schema.management.azure.com/schemas/0.0.1-preview/CreateUIDefinition.MultiVm.json#",
-  "handler": "Microsoft.Compute.MultiVm",
+  "handler": "Microsoft.Compute.VmExtension",
   "version": "0.0.1-preview",
   "parameters": {
-    "basics": [],
-    "steps": [
+    "elements": [
       {
-        "name": "falconApiConfig",
-        "label": "Falcon API Configuration",
+        "name": "apiAuthSection",
+        "type": "Microsoft.Common.Section",
+        "label": "Authentication",
         "elements": [
           {
-            "name": "apiAuthSection",
-            "type": "Microsoft.Common.Section",
-            "label": "Authentication",
-            "elements": [
-              {
-                "name": "authType",
-                "type": "Microsoft.Common.OptionsGroup",
-                "label": "Authentication Method",
-                "defaultValue": "OAuth2 Credentials",
-                "toolTip": "Select the authentication method for the CrowdStrike Falcon Platform",
-                "constraints": {
-                  "allowedValues": [
-                    {
-                      "label": "OAuth2 Credentials",
-                      "value": "oauth2Creds"
-                    },
-                    {
-                      "label": "Access Token",
-                      "value": "accessToken"
-                    },
-                    {
-                      "label": "Azure Key Vault",
-                      "value": "vault"
-                    }
-                  ],
-                  "required": true
+            "name": "authType",
+            "type": "Microsoft.Common.OptionsGroup",
+            "label": "Authentication Method",
+            "defaultValue": "OAuth2 Credentials",
+            "toolTip": "Select the authentication method for the CrowdStrike Falcon Platform",
+            "constraints": {
+              "allowedValues": [
+                {
+                  "label": "OAuth2 Credentials",
+                  "value": "oauth2Creds"
                 },
-                "visible": true
-              },
-              {
-                "name": "clientId",
-                "type": "Microsoft.Common.TextBox",
-                "label": "Client ID",
-                "toolTip": "Client ID for accessing CrowdStrike Falcon Platform",
-                "constraints": {
-                  "required": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'oauth2Creds')]",
-                  "regex": "^.+$",
-                  "validationMessage": "Client ID is required for OAuth2 authentication"
+                {
+                  "label": "Access Token",
+                  "value": "accessToken"
                 },
-                "visible": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'oauth2Creds')]"
-              },
-              {
-                "name": "clientSecret",
-                "type": "Microsoft.Common.PasswordBox",
-                "label": {
-                  "password": "Client Secret"
-                },
-                "toolTip": "Client Secret for accessing CrowdStrike Falcon Platform",
-                "constraints": {
-                  "required": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'oauth2Creds')]",
-                  "regex": "^.+$",
-                  "validationMessage": "Client Secret is required for OAuth2 authentication"
-                },
-                "options": {
-                  "hideConfirmation": true
-                },
-                "visible": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'oauth2Creds')]"
-              },
-              {
-                "name": "accessToken",
-                "type": "Microsoft.Common.PasswordBox",
-                "label": {
-                  "password": "Access Token"
-                },
-                "toolTip": "Access token for accessing CrowdStrike Falcon Platform",
-                "constraints": {
-                  "required": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'accessToken')]",
-                  "regex": "^.+$",
-                  "validationMessage": "Access Token is required"
-                },
-                "options": {
-                  "hideConfirmation": true
-                },
-                "visible": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'accessToken')]"
-              },
-              {
-                "name": "azureVaultName",
-                "type": "Microsoft.Common.TextBox",
-                "label": "Azure Key Vault Name",
-                "toolTip": "Azure Key Vault name for retrieving CrowdStrike API credentials",
-                "constraints": {
-                  "required": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'vault')]",
-                  "regex": "^[a-zA-Z0-9-]*$",
-                  "validationMessage": "Key Vault name can only contain letters, numbers, and hyphens"
-                },
-                "visible": "[equals(steps('falconApiConfig').apiAuthSection.authType, 'vault')]"
-              },
-              {
-                "name": "memberCid",
-                "type": "Microsoft.Common.TextBox",
-                "label": "Member CID (MSSP)",
-                "defaultValue": "",
-                "toolTip": "Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)",
-                "constraints": {
-                  "required": false,
-                  "regex": "^[0-9a-fA-F]{32}$",
-                  "validationMessage": "Please enter a valid 32-character CID"
-                },
-                "visible": true
-              }
-            ]
+                {
+                  "label": "Azure Key Vault",
+                  "value": "vault"
+                }
+              ],
+              "required": true
+            },
+            "visible": true
           },
           {
-            "name": "cloudSection",
-            "type": "Microsoft.Common.Section",
-            "label": "Cloud Configuration",
-            "elements": [
-              {
-                "name": "cloud",
-                "type": "Microsoft.Common.DropDown",
-                "label": "Falcon Cloud",
-                "defaultValue": "Auto Discover (Recommended)",
-                "toolTip": "Falcon cloud abbreviation. Auto Discover is recommended and will automatically determine the correct cloud.",
-                "constraints": {
-                  "allowedValues": [
-                    {
-                      "label": "Auto Discover (Recommended)",
-                      "value": "autodiscover"
-                    },
-                    {
-                      "label": "US-1",
-                      "value": "us-1"
-                    },
-                    {
-                      "label": "US-2",
-                      "value": "us-2"
-                    },
-                    {
-                      "label": "EU-1",
-                      "value": "eu-1"
-                    }
-                  ],
-                  "required": true
-                }
-              }
-            ]
+            "name": "clientId",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Client ID",
+            "toolTip": "Client ID for accessing CrowdStrike Falcon Platform",
+            "constraints": {
+              "required": "[equals(elements('apiAuthSection').authType, 'oauth2Creds')]",
+              "regex": "^.+$",
+              "validationMessage": "Client ID is required for OAuth2 authentication"
+            },
+            "visible": "[equals(elements('apiAuthSection').authType, 'oauth2Creds')]"
+          },
+          {
+            "name": "clientSecret",
+            "type": "Microsoft.Common.PasswordBox",
+            "label": {
+              "password": "Client Secret"
+            },
+            "toolTip": "Client Secret for accessing CrowdStrike Falcon Platform",
+            "constraints": {
+              "required": "[equals(elements('apiAuthSection').authType, 'oauth2Creds')]",
+              "regex": "^.+$",
+              "validationMessage": "Client Secret is required for OAuth2 authentication"
+            },
+            "options": {
+              "hideConfirmation": true
+            },
+            "visible": "[equals(elements('apiAuthSection').authType, 'oauth2Creds')]"
+          },
+          {
+            "name": "accessToken",
+            "type": "Microsoft.Common.PasswordBox",
+            "label": {
+              "password": "Access Token"
+            },
+            "toolTip": "Access token for accessing CrowdStrike Falcon Platform",
+            "constraints": {
+              "required": "[equals(elements('apiAuthSection').authType, 'accessToken')]",
+              "regex": "^.+$",
+              "validationMessage": "Access Token is required"
+            },
+            "options": {
+              "hideConfirmation": true
+            },
+            "visible": "[equals(elements('apiAuthSection').authType, 'accessToken')]"
+          },
+          {
+            "name": "azureVaultName",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Azure Key Vault Name",
+            "toolTip": "Azure Key Vault name for retrieving CrowdStrike API credentials",
+            "constraints": {
+              "required": "[equals(elements('apiAuthSection').authType, 'vault')]",
+              "regex": "^[a-zA-Z0-9-]*$",
+              "validationMessage": "Key Vault name can only contain letters, numbers, and hyphens"
+            },
+            "visible": "[equals(elements('apiAuthSection').authType, 'vault')]"
+          },
+          {
+            "name": "memberCid",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Member CID (MSSP)",
+            "defaultValue": "",
+            "toolTip": "Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)",
+            "constraints": {
+              "required": false,
+              "regex": "^[0-9a-fA-F]{32}$",
+              "validationMessage": "Please enter a valid 32-character CID"
+            },
+            "visible": true
           }
         ]
       },
       {
-        "name": "sensorConfig",
-        "label": "Falcon Sensor Configuration",
+        "name": "cloudSection",
+        "type": "Microsoft.Common.Section",
+        "label": "Cloud Configuration",
         "elements": [
           {
-            "name": "sensorVersionSection",
-            "type": "Microsoft.Common.Section",
-            "label": "Sensor Version",
-            "elements": [
-              {
-                "name": "sensorUpdatePolicy",
-                "type": "Microsoft.Common.TextBox",
-                "label": "Sensor Update Policy",
-                "defaultValue": "platform_default",
-                "toolTip": "The sensor update policy name to use for sensor installation",
-                "constraints": {
-                  "required": false
+            "name": "cloud",
+            "type": "Microsoft.Common.DropDown",
+            "label": "Falcon Cloud",
+            "defaultValue": "Auto Discover (Recommended)",
+            "toolTip": "Falcon cloud abbreviation. Auto Discover is recommended and will automatically determine the correct cloud.",
+            "constraints": {
+              "allowedValues": [
+                {
+                  "label": "Auto Discover (Recommended)",
+                  "value": "autodiscover"
+                },
+                {
+                  "label": "US-1",
+                  "value": "us-1"
+                },
+                {
+                  "label": "US-2",
+                  "value": "us-2"
+                },
+                {
+                  "label": "EU-1",
+                  "value": "eu-1"
                 }
-              }
-            ]
-          },
+              ],
+              "required": true
+            }
+          }
+        ]
+      },
+      {
+        "name": "sensorVersionSection",
+        "type": "Microsoft.Common.Section",
+        "label": "Sensor Version",
+        "elements": [
           {
-            "name": "tokenSection",
-            "type": "Microsoft.Common.Section",
+            "name": "sensorUpdatePolicy",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Sensor Update Policy",
+            "defaultValue": "platform_default",
+            "toolTip": "The sensor update policy name to use for sensor installation",
+            "constraints": {
+              "required": false
+            }
+          }
+        ]
+      },
+      {
+        "name": "tokenSection",
+        "type": "Microsoft.Common.Section",
+        "label": "Provisioning Token",
+        "elements": [
+          {
+            "name": "provisioningToken",
+            "type": "Microsoft.Common.TextBox",
             "label": "Provisioning Token",
-            "elements": [
-              {
-                "name": "provisioningToken",
-                "type": "Microsoft.Common.TextBox",
-                "label": "Provisioning Token",
-                "defaultValue": "",
-                "toolTip": "The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token",
-                "constraints": {
-                  "required": false
-                }
-              }
-            ]
+            "defaultValue": "",
+            "toolTip": "The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token",
+            "constraints": {
+              "required": false
+            }
+          }
+        ]
+      },
+      {
+        "name": "proxySection",
+        "type": "Microsoft.Common.Section",
+        "label": "Proxy Configuration",
+        "elements": [
+          {
+            "name": "disableProxy",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Disable Proxy Settings",
+            "toolTip": "Disable the sensor proxy settings"
           },
           {
-            "name": "proxySection",
-            "type": "Microsoft.Common.Section",
-            "label": "Proxy Configuration",
-            "elements": [
-              {
-                "name": "disableProxy",
-                "type": "Microsoft.Common.CheckBox",
-                "label": "Disable Proxy Settings",
-                "toolTip": "Disable the sensor proxy settings"
-              },
-              {
-                "name": "proxyHost",
-                "type": "Microsoft.Common.TextBox",
-                "label": "Proxy Host",
-                "defaultValue": "",
-                "toolTip": "The proxy host for the sensor to use when communicating with CrowdStrike",
-                "constraints": {
-                  "required": false
-                },
-                "visible": "[not(steps('sensorConfig').proxySection.disableProxy)]"
-              },
-              {
-                "name": "proxyPort",
-                "type": "Microsoft.Common.TextBox",
-                "label": "Proxy Port",
-                "defaultValue": "",
-                "toolTip": "The proxy port for the sensor to use when communicating with CrowdStrike",
-                "constraints": {
-                  "required": false,
-                  "regex": "^[0-9]*$",
-                  "validationMessage": "Proxy port must be a number"
-                },
-                "visible": "[not(steps('sensorConfig').proxySection.disableProxy)]"
-              }
-            ]
+            "name": "proxyHost",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Proxy Host",
+            "defaultValue": "",
+            "toolTip": "The proxy host for the sensor to use when communicating with CrowdStrike",
+            "constraints": {
+              "required": false
+            },
+            "visible": "[not(elements('proxySection').disableProxy)]"
           },
           {
-            "name": "tagsSection",
-            "type": "Microsoft.Common.Section",
-            "label": "Tags",
-            "elements": [
-              {
-                "name": "tags",
-                "type": "Microsoft.Common.TextBox",
-                "label": "Sensor Tags",
-                "defaultValue": "",
-                "toolTip": "A comma separated list of tags for sensor grouping",
-                "constraints": {
-                  "required": false
-                }
-              }
-            ]
+            "name": "proxyPort",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Proxy Port",
+            "defaultValue": "",
+            "toolTip": "The proxy port for the sensor to use when communicating with CrowdStrike",
+            "constraints": {
+              "required": false,
+              "regex": "^[0-9]*$",
+              "validationMessage": "Proxy port must be a number"
+            },
+            "visible": "[not(elements('proxySection').disableProxy)]"
+          }
+        ]
+      },
+      {
+        "name": "tagsSection",
+        "type": "Microsoft.Common.Section",
+        "label": "Tags",
+        "elements": [
+          {
+            "name": "tags",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Sensor Tags",
+            "defaultValue": "",
+            "toolTip": "A comma separated list of tags for sensor grouping",
+            "constraints": {
+              "required": false
+            }
           }
         ]
       }
     ],
     "outputs": {
-      "access-token": "[steps('falconApiConfig').apiAuthSection.accessToken]",
-      "client-id": "[steps('falconApiConfig').apiAuthSection.clientId]",
-      "client-secret": "[steps('falconApiConfig').apiAuthSection.clientSecret]",
-      "azure-vault-name": "[steps('falconApiConfig').apiAuthSection.azureVaultName]",
-      "cloud": "[steps('falconApiConfig').cloudSection.cloud]",
-      "member-cid": "[steps('falconApiConfig').apiAuthSection.memberCid]",
-      "sensor-update-policy": "[steps('sensorConfig').sensorVersionSection.sensorUpdatePolicy]",
-      "disable-proxy": "[steps('sensorConfig').proxySection.disableProxy]",
-      "provisioning-token": "[steps('sensorConfig').tokenSection.provisioningToken]",
-      "proxy-host": "[steps('sensorConfig').proxySection.proxyHost]",
-      "proxy-port": "[steps('sensorConfig').proxySection.proxyPort]",
-      "tags": "[steps('sensorConfig').tagsSection.tags]"
+      "vmName": "[vmName()]",
+      "location": "[location()]",
+      "access_token": "[elements('apiAuthSection').accessToken]",
+      "client_id": "[elements('apiAuthSection').clientId]",
+      "client_secret": "[elements('apiAuthSection').clientSecret]",
+      "azure_vault_name": "[elements('apiAuthSection').azureVaultName]",
+      "cloud": "[elements('cloudSection').cloud]",
+      "member_cid": "[elements('apiAuthSection').memberCid]",
+      "sensor_update_policy": "[elements('sensorVersionSection').sensorUpdatePolicy]",
+      "disable_proxy": "[elements('proxySection').disableProxy]",
+      "provisioning_token": "[elements('tokenSection').provisioningToken]",
+      "proxy_host": "[elements('proxySection').proxyHost]",
+      "proxy_port": "[elements('proxySection').proxyPort]",
+      "tags": "[elements('tagsSection').tags]"
     }
   }
 }

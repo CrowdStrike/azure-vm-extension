@@ -223,7 +223,7 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
               }
               {
                 field: 'Microsoft.Compute/virtualMachines/extensions/publisher'
-                equals: 'CrowdStrike.Falcon'
+                equals: 'Crowdstrike.Falcon'
               }
             ]
           }
@@ -258,7 +258,7 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
                     location: '[parameters(\'location\')]'
                     apiVersion: '2021-07-01'
                     properties: {
-                      publisher: 'CrowdStrike.Falcon'
+                      publisher: 'Crowdstrike.Falcon'
                       type: 'FalconSensorLinux'
                       typeHandlerVersion: '[parameters(\'handlerVersion\')]'
                       autoUpgradeMinorVersion: '[parameters(\'autoUpgradeMinorVersion\')]'
@@ -606,7 +606,7 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
               }
               {
                 field: 'Microsoft.Compute/virtualMachines/extensions/publisher'
-                equals: 'CrowdStrike.Falcon'
+                equals: 'Crowdstrike.Falcon'
               }
             ]
           }
@@ -646,7 +646,7 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                     location: '[parameters(\'location\')]'
                     apiVersion: '2021-07-01'
                     properties: {
-                      publisher: 'CrowdStrike.Falcon'
+                      publisher: 'Crowdstrike.Falcon'
                       type: 'FalconSensorWindows'
                       typeHandlerVersion: '[parameters(\'handlerVersion\')]'
                       autoUpgradeMinorVersion: '[parameters(\'autoUpgradeMinorVersion\')]'
