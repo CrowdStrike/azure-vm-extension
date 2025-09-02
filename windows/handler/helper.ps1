@@ -1,6 +1,5 @@
 # helper.ps1
 
-$SERVICE_NAME = "csagent"
 $VERSION = "0.0.0"
 
 # Get the log folder path from HandlerEnvironment.json
