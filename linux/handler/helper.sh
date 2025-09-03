@@ -1,7 +1,6 @@
 #!/usr/bin/bash
 set -euo pipefail
 
-readonly SERVICE_NAME="falcon-sensor.service"
 readonly VERSION="0.0.0"
 
 # Get the log folder path from HandlerEnvironment.json
