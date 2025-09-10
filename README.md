@@ -237,6 +237,36 @@ Make sure to enable `Azure Resource Manager for template deployment` in your Azu
 
 For automated enterprise-scale deployment using Azure Policy, see the [Policy Templates](policy/README.md) documentation for detailed instructions on deploying CrowdStrike Falcon at scale using Azure Policy. The templates support both subscription and management group level assignments, with automatic detection of Windows and Linux VMs.
 
+### VM Scale Sets (VMSS)
+
+> [!IMPORTANT]
+> When deploying the CrowdStrike Falcon extension to Azure VM Scale Sets, there are important networking considerations to ensure proper sensor installation and operation.
+> Make sure that the VM Scale Sets outbound rules for the load balancer are properly configured to enable connectivity to CrowdStrike APIs for sensor download and installation; otherwise, the sensor installation will fail.
+
+#### Example Adding the CrowdStrike Falcon Extension to a VM Scale Set
+
+```json
+"extensionProfile": {
+  "extensions": [
+    {
+      "name": "CrowdstrikeFalconSensor",
+      "properties": {
+        "publisher": "[variables('extensionPublisher')]",
+        "type": "[variables('extensionName')]",
+        "typeHandlerVersion": "[parameters('extensionVersion')]",
+        "autoUpgradeMinorVersion": true,
+        "protectedSettings": {
+          "client_id": "[parameters('falconClientId')]",
+          "client_secret": "[parameters('falconClientSecret')]",
+          "tags": "[parameters('sensorTags')]",
+          "sensor_update_policy": "[parameters('sensorUpdatePolicy')]"
+        }
+      }
+    }
+  ]
+}
+```
+
 ## Documentation
 
 - **[FAQ](docs/faq.md)** - Frequently asked questions and troubleshooting
