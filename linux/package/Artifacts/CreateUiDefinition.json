@@ -83,7 +83,7 @@
             "name": "azureVaultName",
             "type": "Microsoft.Common.TextBox",
             "label": "Azure Key Vault Name",
-            "toolTip": "Azure Key Vault name for retrieving CrowdStrike API credentials",
+            "toolTip": "Name of the Azure Key Vault containing CrowdStrike API credentials",
             "constraints": {
               "required": "[equals(elements('apiAuthSection').authType, 'vault')]",
               "regex": "^[a-zA-Z0-9-]*$",
@@ -165,12 +165,17 @@
         "elements": [
           {
             "name": "provisioningToken",
-            "type": "Microsoft.Common.TextBox",
-            "label": "Provisioning Token",
+            "type": "Microsoft.Common.PasswordBox",
+            "label": {
+              "password": "Token"
+            },
             "defaultValue": "",
             "toolTip": "The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token",
             "constraints": {
               "required": false
+            },
+            "options": {
+              "hideConfirmation": true
             }
           }
         ]
@@ -233,17 +238,17 @@
     "outputs": {
       "vmName": "[vmName()]",
       "location": "[location()]",
-      "access_token": "[elements('apiAuthSection').accessToken]",
-      "client_id": "[elements('apiAuthSection').clientId]",
-      "client_secret": "[elements('apiAuthSection').clientSecret]",
-      "azure_vault_name": "[elements('apiAuthSection').azureVaultName]",
+      "access-token": "[elements('apiAuthSection').accessToken]",
+      "client-id": "[elements('apiAuthSection').clientId]",
+      "client-secret": "[elements('apiAuthSection').clientSecret]",
+      "azure-vault-name": "[elements('apiAuthSection').azureVaultName]",
       "cloud": "[elements('cloudSection').cloud]",
-      "member_cid": "[elements('apiAuthSection').memberCid]",
-      "sensor_update_policy": "[elements('sensorVersionSection').sensorUpdatePolicy]",
-      "disable_proxy": "[elements('proxySection').disableProxy]",
-      "provisioning_token": "[elements('tokenSection').provisioningToken]",
-      "proxy_host": "[elements('proxySection').proxyHost]",
-      "proxy_port": "[elements('proxySection').proxyPort]",
+      "member-cid": "[elements('apiAuthSection').memberCid]",
+      "sensor-update-policy": "[elements('sensorVersionSection').sensorUpdatePolicy]",
+      "disable-proxy": "[elements('proxySection').disableProxy]",
+      "provisioning-token": "[elements('tokenSection').provisioningToken]",
+      "proxy-host": "[elements('proxySection').proxyHost]",
+      "proxy-port": "[elements('proxySection').proxyPort]",
       "tags": "[elements('tagsSection').tags]"
     }
   }

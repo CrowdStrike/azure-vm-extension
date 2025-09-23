@@ -128,7 +128,7 @@
       }
     },
     "azure-vault-name": {
-      "type": "securestring",
+      "type": "string",
       "defaultValue": "",
       "metadata": {
         "description": "Azure Key Vault name for retrieving CrowdStrike API credentials"
@@ -153,25 +153,25 @@
         "typeHandlerVersion": "[variables('extensionTypeHandlerVersion')]",
         "autoUpgradeMinorVersion": true,
         "settings": {
+          "azure_vault_name": "[parameters('azure-vault-name')]",
           "cloud": "[parameters('cloud')]",
-          "member-cid": "[parameters('member-cid')]",
-          "sensor-update-policy": "[parameters('sensor-update-policy')]",
-          "disable-proxy": "[parameters('disable-proxy')]",
-          "proxy-host": "[parameters('proxy-host')]",
-          "proxy-port": "[parameters('proxy-port')]",
+          "member_cid": "[parameters('member-cid')]",
+          "sensor_update_policy": "[parameters('sensor-update-policy')]",
+          "disable_proxy": "[parameters('disable-proxy')]",
+          "proxy_host": "[parameters('proxy-host')]",
+          "proxy_port": "[parameters('proxy-port')]",
           "tags": "[parameters('tags')]",
-          "disable-provisioning-wait": "[parameters('disable-provisioning-wait')]",
-          "disable-start": "[parameters('disable-start')]",
-          "pac-url": "[parameters('pac-url')]",
-          "provisioning-wait-time": "[parameters('provisioning-wait-time')]",
+          "disable_provisioning_wait": "[parameters('disable-provisioning-wait')]",
+          "disable_start": "[parameters('disable-start')]",
+          "pac_url": "[parameters('pac-url')]",
+          "provisioning_wait_time": "[parameters('provisioning-wait-time')]",
           "vdi": "[parameters('vdi')]"
         },
         "protectedSettings": {
-          "access-token": "[parameters('access-token')]",
-          "client-id": "[parameters('client-id')]",
-          "client-secret": "[parameters('client-secret')]",
-          "provisioning-token": "[parameters('provisioning-token')]",
-          "azure-vault-name": "[parameters('azure-vault-name')]"
+          "access_token": "[parameters('access-token')]",
+          "client_id": "[parameters('client-id')]",
+          "client_secret": "[parameters('client-secret')]",
+          "provisioning_token": "[parameters('provisioning-token')]"
         }
       }
     }
