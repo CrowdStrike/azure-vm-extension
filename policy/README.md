@@ -26,10 +26,11 @@ The Azure Policy templates are available as part of the official CrowdStrike Azu
 ## Features
 
 ### Core Functionality
-- **Automatic Detection**: Policies detect Windows and Linux VMs automatically
+- **Automatic Detection**: Policies detect Windows and Linux VMs and Virtual Machine Scale Sets (VMSS) automatically
 - **Extension Installation**: Uses official CrowdStrike VM extensions for reliable deployment
+- **VM and VMSS Support**: Comprehensive coverage of both individual VMs and VMSS instances
 - **Managed Identity**: Secure deployment using system-assigned managed identities
-- **Role Assignment**: Automatically assigns necessary permissions for VM extension deployment
+- **Role Assignment**: Automatically assigns necessary permissions for VM and VMSS extension deployment
 
 ### Policy Effects
 - **DeployIfNotExists**: Automatically installs Falcon sensor if not present (default)
@@ -49,11 +50,22 @@ The Azure Policy templates are available as part of the official CrowdStrike Azu
 - **Proxy Settings**: HTTP proxy configuration
 - **Platform-specific settings**: Windows PAC URL, VDI mode; Linux provisioning token
 
+## Policy Structure
+
+Each template creates **4 policy definitions** for comprehensive coverage:
+
+1. **Linux VM Policy** - Deploys Falcon sensor on individual Linux virtual machines
+2. **Linux VMSS Policy** - Deploys Falcon sensor on Linux Virtual Machine Scale Sets
+3. **Windows VM Policy** - Deploys Falcon sensor on individual Windows virtual machines
+4. **Windows VMSS Policy** - Deploys Falcon sensor on Windows Virtual Machine Scale Sets
+
+All policies support the same configuration parameters and authentication methods, ensuring consistent sensor deployment across your entire Azure compute infrastructure.
+
 ## Deployment Options
 
 ### Option 1: Subscription Level (Recommended)
 
-Deploy policies at the subscription level to cover all VMs in the subscription:
+Deploy policies at the subscription level to cover all VMs and VMSS in the subscription:
 
 #### Azure CLI
 ```bash
@@ -114,7 +126,7 @@ New-AzSubscriptionDeployment `
 
 ### Option 2: Management Group Level
 
-Deploy policies at the management group level for enterprise-wide deployment across multiple subscriptions.
+Deploy policies at the management group level for enterprise-wide deployment across multiple subscriptions covering all VMs and VMSS.
 
 > [!IMPORTANT]
 > The management group must already exist before deploying policies to it. Use `az account management-group create` to create a new management group if needed.
@@ -260,7 +272,10 @@ See https://github.com/CrowdStrike/azure-vm-extension?tab=readme-ov-file#falcon-
 
 ### Understanding `createRoleAssignments` Parameter
 
-The templates create managed identities that need **Virtual Machine Contributor** role to deploy VM extensions.
+The templates create managed identities that need **Virtual Machine Contributor** role to deploy both VM and VMSS extensions.
+
+> [!NOTE]
+> The **Virtual Machine Contributor** role provides sufficient permissions for both individual VM extensions (`Microsoft.Compute/virtualMachines/extensions/*`) and VMSS extensions (`Microsoft.Compute/virtualMachineScaleSets/extensions/*`). No additional role assignments are required for VMSS support.
 
 **If you have Owner or User Access Administrator role:**
 - By default, `createRoleAssignments=true` will create the necessary role assignments automatically. You do not need to take any additional action.
@@ -271,41 +286,39 @@ The templates create managed identities that need **Virtual Machine Contributor*
 
 ### Manual Role Assignment
 
-When `createRoleAssignments=false`, you must manually assign the VM Contributor role:
+When `createRoleAssignments=false`, you must manually assign the VM Contributor role to all 4 policy managed identities:
 
 #### Azure CLI
 ```bash
-# Get policy assignment principal IDs from deployment outputs
-LINUX_PRINCIPAL_ID=$(az deployment sub show --name YourDeploymentName --query 'properties.outputs.linuxPolicyPrincipalId.value' -o tsv)
-WINDOWS_PRINCIPAL_ID=$(az deployment sub show --name YourDeploymentName --query 'properties.outputs.windowsPolicyPrincipalId.value' -o tsv)
+# Get all policy assignment principal IDs from deployment outputs
+LINUX_VM_PRINCIPAL_ID=$(az deployment sub show --name YourDeploymentName --query 'properties.outputs.linuxVmPolicyPrincipalId.value' -o tsv)
+LINUX_VMSS_PRINCIPAL_ID=$(az deployment sub show --name YourDeploymentName --query 'properties.outputs.linuxVmssPolicyPrincipalId.value' -o tsv)
+WINDOWS_VM_PRINCIPAL_ID=$(az deployment sub show --name YourDeploymentName --query 'properties.outputs.windowsVmPolicyPrincipalId.value' -o tsv)
+WINDOWS_VMSS_PRINCIPAL_ID=$(az deployment sub show --name YourDeploymentName --query 'properties.outputs.windowsVmssPolicyPrincipalId.value' -o tsv)
 
-# Assign VM Contributor role to managed identities
-az role assignment create \
-  --assignee "$LINUX_PRINCIPAL_ID" \
-  --role "Virtual Machine Contributor" \
-  --scope "/subscriptions/$(az account show --query id -o tsv)"
+# Assign VM Contributor role to all policy managed identities
+SUBSCRIPTION_SCOPE="/subscriptions/$(az account show --query id -o tsv)"
 
-az role assignment create \
-  --assignee "$WINDOWS_PRINCIPAL_ID" \
-  --role "Virtual Machine Contributor" \
-  --scope "/subscriptions/$(az account show --query id -o tsv)"
+az role assignment create --assignee "$LINUX_VM_PRINCIPAL_ID" --role "Virtual Machine Contributor" --scope "$SUBSCRIPTION_SCOPE"
+az role assignment create --assignee "$LINUX_VMSS_PRINCIPAL_ID" --role "Virtual Machine Contributor" --scope "$SUBSCRIPTION_SCOPE"
+az role assignment create --assignee "$WINDOWS_VM_PRINCIPAL_ID" --role "Virtual Machine Contributor" --scope "$SUBSCRIPTION_SCOPE"
+az role assignment create --assignee "$WINDOWS_VMSS_PRINCIPAL_ID" --role "Virtual Machine Contributor" --scope "$SUBSCRIPTION_SCOPE"
 ```
 
 #### PowerShell
 ```powershell
-# Get policy assignment principal IDs from deployment outputs
+# Get all policy assignment principal IDs from deployment outputs
 $deploymentName = "YourDeploymentName"
-$linuxPrincipalId = (Get-AzSubscriptionDeployment -Name $deploymentName).Outputs.linuxPolicyPrincipalId.Value
-$windowsPrincipalId = (Get-AzSubscriptionDeployment -Name $deploymentName).Outputs.windowsPolicyPrincipalId.Value
+$linuxVmPrincipalId = (Get-AzSubscriptionDeployment -Name $deploymentName).Outputs.linuxVmPolicyPrincipalId.Value
+$linuxVmssPrincipalId = (Get-AzSubscriptionDeployment -Name $deploymentName).Outputs.linuxVmssPolicyPrincipalId.Value
+$windowsVmPrincipalId = (Get-AzSubscriptionDeployment -Name $deploymentName).Outputs.windowsVmPolicyPrincipalId.Value
+$windowsVmssPrincipalId = (Get-AzSubscriptionDeployment -Name $deploymentName).Outputs.windowsVmssPolicyPrincipalId.Value
 
-# Assign VM Contributor role to managed identities
-New-AzRoleAssignment `
-  -ObjectId $linuxPrincipalId `
-  -RoleDefinitionName "Virtual Machine Contributor" `
-  -Scope "/subscriptions/$((Get-AzContext).Subscription.Id)"
+# Assign VM Contributor role to all policy managed identities
+$subscriptionScope = "/subscriptions/$((Get-AzContext).Subscription.Id)"
 
-New-AzRoleAssignment `
-  -ObjectId $windowsPrincipalId `
-  -RoleDefinitionName "Virtual Machine Contributor" `
-  -Scope "/subscriptions/$((Get-AzContext).Subscription.Id)"
+New-AzRoleAssignment -ObjectId $linuxVmPrincipalId -RoleDefinitionName "Virtual Machine Contributor" -Scope $subscriptionScope
+New-AzRoleAssignment -ObjectId $linuxVmssPrincipalId -RoleDefinitionName "Virtual Machine Contributor" -Scope $subscriptionScope
+New-AzRoleAssignment -ObjectId $windowsVmPrincipalId -RoleDefinitionName "Virtual Machine Contributor" -Scope $subscriptionScope
+New-AzRoleAssignment -ObjectId $windowsVmssPrincipalId -RoleDefinitionName "Virtual Machine Contributor" -Scope $subscriptionScope
 ```
