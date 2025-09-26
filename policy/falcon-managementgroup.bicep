@@ -58,143 +58,269 @@ var vmRoleDefinitionId = '8e3af657-a8ff-443c-a75c-2fe8c4bcb635'
 var linuxPolicyDefinitionName = '${policyDefinitionNamePrefix}-Linux'
 var windowsPolicyDefinitionName = '${policyDefinitionNamePrefix}-Windows'
 
-// Create Linux policy definition
-resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (operatingSystemLower == 'linux' || operatingSystemLower == 'both') {
-  name: linuxPolicyDefinitionName
+var policyMetadata = {
+  category: 'Security'
+  version: '1.0.0'
+}
+
+var commonParameters = {
+  effect: {
+    type: 'String'
+    metadata: {
+      displayName: 'Effect'
+      description: 'Enable or disable the execution of the policy'
+    }
+    allowedValues: [
+      'DeployIfNotExists'
+      'AuditIfNotExists'
+      'Disabled'
+    ]
+    defaultValue: 'DeployIfNotExists'
+  }
+  clientId: {
+    type: 'String'
+    metadata: {
+      displayName: 'CrowdStrike Client ID'
+      description: 'CrowdStrike API Client ID'
+    }
+  }
+  clientSecret: {
+    type: 'String'
+    metadata: {
+      displayName: 'CrowdStrike Client Secret'
+      description: 'CrowdStrike API Client Secret'
+    }
+  }
+  accessToken: {
+    type: 'String'
+    metadata: {
+      displayName: 'CrowdStrike Access Token'
+      description: 'CrowdStrike API Access Token'
+    }
+  }
+  azureVaultName: {
+    type: 'String'
+    metadata: {
+      displayName: 'Azure Key Vault Name'
+      description: 'Azure Key Vault name for credential storage'
+    }
+    defaultValue: ''
+  }
+  cloud: {
+    type: 'String'
+    metadata: {
+      displayName: 'CrowdStrike Cloud'
+      description: 'CrowdStrike Cloud region'
+    }
+    defaultValue: 'autodiscover'
+  }
+  memberCid: {
+    type: 'String'
+    metadata: {
+      displayName: 'Member CID'
+      description: 'CrowdStrike Member CID'
+    }
+    defaultValue: ''
+  }
+  sensorUpdatePolicy: {
+    type: 'String'
+    metadata: {
+      displayName: 'Sensor Update Policy'
+      description: 'CrowdStrike Sensor Update Policy'
+    }
+    defaultValue: 'platform_default'
+  }
+  disableProxy: {
+    type: 'Boolean'
+    metadata: {
+      displayName: 'Disable Proxy'
+      description: 'Disable proxy settings'
+    }
+    defaultValue: false
+  }
+  provisioningToken: {
+    type: 'String'
+    metadata: {
+      displayName: 'Provisioning Token'
+      description: 'CrowdStrike Provisioning Token'
+    }
+    defaultValue: ''
+  }
+  proxyHost: {
+    type: 'String'
+    metadata: {
+      displayName: 'Proxy Host'
+      description: 'Proxy host configuration'
+    }
+    defaultValue: ''
+  }
+  proxyPort: {
+    type: 'String'
+    metadata: {
+      displayName: 'Proxy Port'
+      description: 'Proxy port configuration'
+    }
+    defaultValue: ''
+  }
+  tags: {
+    type: 'String'
+    metadata: {
+      displayName: 'Tags'
+      description: 'Comma-separated list of tags'
+    }
+    defaultValue: ''
+  }
+  handlerVersion: {
+    type: 'String'
+    metadata: {
+      displayName: 'Handler Version'
+      description: 'CrowdStrike Falcon extension handler version'
+    }
+    defaultValue: '0.0'
+  }
+  autoUpgradeMinorVersion: {
+    type: 'Boolean'
+    metadata: {
+      displayName: 'Auto Upgrade Minor Version'
+      description: 'Auto upgrade minor version for the CrowdStrike Falcon extension'
+    }
+    defaultValue: true
+  }
+}
+
+var windowsSpecificParameters = {
+  pacUrl: {
+    type: 'String'
+    metadata: {
+      displayName: 'PAC URL'
+      description: 'PAC URL for Windows'
+    }
+    defaultValue: ''
+  }
+  disableProvisioningWait: {
+    type: 'Boolean'
+    metadata: {
+      displayName: 'Disable Provisioning Wait'
+      description: 'Disable provisioning wait for Windows'
+    }
+    defaultValue: false
+  }
+  disableStart: {
+    type: 'Boolean'
+    metadata: {
+      displayName: 'Disable Start'
+      description: 'Disable start for Windows'
+    }
+    defaultValue: false
+  }
+  provisioningWaitTime: {
+    type: 'String'
+    metadata: {
+      displayName: 'Provisioning Wait Time'
+      description: 'Provisioning wait time for Windows'
+    }
+    defaultValue: '1200000'
+  }
+  vdi: {
+    type: 'Boolean'
+    metadata: {
+      displayName: 'VDI'
+      description: 'VDI setting for Windows'
+    }
+    defaultValue: false
+  }
+}
+
+var commonTemplateParameters = {
+  resourceName: { type: 'string' }
+  location: { type: 'string' }
+  clientId: { type: 'securestring' }
+  clientSecret: { type: 'securestring' }
+  accessToken: { type: 'securestring' }
+  azureVaultName: { type: 'securestring' }
+  cloud: { type: 'string' }
+  memberCid: { type: 'string' }
+  sensorUpdatePolicy: { type: 'string' }
+  disableProxy: { type: 'bool' }
+  provisioningToken: { type: 'securestring' }
+  proxyHost: { type: 'string' }
+  proxyPort: { type: 'string' }
+  tags: { type: 'string' }
+  handlerVersion: { type: 'string' }
+  autoUpgradeMinorVersion: { type: 'bool' }
+}
+
+var windowsTemplateParameters = union(commonTemplateParameters, {
+  pacUrl: { type: 'string' }
+  disableProvisioningWait: { type: 'bool' }
+  disableStart: { type: 'bool' }
+  provisioningWaitTime: { type: 'string' }
+  vdi: { type: 'bool' }
+})
+
+var commonTemplateParameterValues = {
+  resourceName: { value: '[field(\'name\')]' }
+  location: { value: '[field(\'location\')]' }
+  clientId: { value: '[parameters(\'clientId\')]' }
+  clientSecret: { value: '[parameters(\'clientSecret\')]' }
+  accessToken: { value: '[parameters(\'accessToken\')]' }
+  azureVaultName: { value: '[parameters(\'azureVaultName\')]' }
+  cloud: { value: '[parameters(\'cloud\')]' }
+  memberCid: { value: '[parameters(\'memberCid\')]' }
+  sensorUpdatePolicy: { value: '[parameters(\'sensorUpdatePolicy\')]' }
+  disableProxy: { value: '[parameters(\'disableProxy\')]' }
+  provisioningToken: { value: '[parameters(\'provisioningToken\')]' }
+  proxyHost: { value: '[parameters(\'proxyHost\')]' }
+  proxyPort: { value: '[parameters(\'proxyPort\')]' }
+  tags: { value: '[parameters(\'tags\')]' }
+  handlerVersion: { value: '[parameters(\'handlerVersion\')]' }
+  autoUpgradeMinorVersion: { value: '[parameters(\'autoUpgradeMinorVersion\')]' }
+}
+
+var windowsTemplateParameterValues = union(commonTemplateParameterValues, {
+  pacUrl: { value: '[parameters(\'pacUrl\')]' }
+  disableProvisioningWait: { value: '[parameters(\'disableProvisioningWait\')]' }
+  disableStart: { value: '[parameters(\'disableStart\')]' }
+  provisioningWaitTime: { value: '[parameters(\'provisioningWaitTime\')]' }
+  vdi: { value: '[parameters(\'vdi\')]' }
+})
+
+var commonLinuxAssignmentParameters = {
+  effect: { value: policyEffect }
+  clientId: { value: clientId }
+  clientSecret: { value: clientSecret }
+  accessToken: { value: accessToken }
+  azureVaultName: { value: azureVaultName }
+  cloud: { value: cloud }
+  memberCid: { value: memberCid }
+  sensorUpdatePolicy: { value: sensorUpdatePolicy }
+  disableProxy: { value: disableProxy }
+  provisioningToken: { value: provisioningToken }
+  proxyHost: { value: proxyHost }
+  proxyPort: { value: proxyPort }
+  tags: { value: tags }
+  handlerVersion: { value: handlerVersion }
+  autoUpgradeMinorVersion: { value: autoUpgradeMinorVersion }
+}
+
+var commonWindowsAssignmentParameters = union(commonLinuxAssignmentParameters, {
+  pacUrl: { value: pacUrl }
+  disableProvisioningWait: { value: disableProvisioningWait }
+  disableStart: { value: disableStart }
+  provisioningWaitTime: { value: provisioningWaitTime }
+  vdi: { value: vdi }
+})
+
+// Create Linux VM policy definition
+resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (operatingSystemLower == 'linux' || operatingSystemLower == 'both') {
+  name: '${linuxPolicyDefinitionName}-VM'
   properties: {
     displayName: 'Deploy CrowdStrike Falcon sensor on Linux VMs'
     description: 'This policy deploys CrowdStrike Falcon sensor on Linux VMs if not installed'
     policyType: 'Custom'
     mode: 'Indexed'
-    metadata: {
-      category: 'Security'
-      version: '1.0.0'
-    }
-    parameters: {
-      effect: {
-        type: 'String'
-        metadata: {
-          displayName: 'Effect'
-          description: 'Enable or disable the execution of the policy'
-        }
-        allowedValues: [
-          'DeployIfNotExists'
-          'AuditIfNotExists'
-          'Disabled'
-        ]
-        defaultValue: 'DeployIfNotExists'
-      }
-      clientId: {
-        type: 'String'
-        metadata: {
-          displayName: 'CrowdStrike Client ID'
-          description: 'CrowdStrike API Client ID'
-        }
-      }
-      clientSecret: {
-        type: 'String'
-        metadata: {
-          displayName: 'CrowdStrike Client Secret'
-          description: 'CrowdStrike API Client Secret'
-        }
-      }
-      accessToken: {
-        type: 'String'
-        metadata: {
-          displayName: 'CrowdStrike Access Token'
-          description: 'CrowdStrike API Access Token'
-        }
-        defaultValue: ''
-      }
-      azureVaultName: {
-        type: 'String'
-        metadata: {
-          displayName: 'Azure Key Vault Name'
-          description: 'Azure Key Vault name containing CrowdStrike credentials'
-        }
-        defaultValue: ''
-      }
-      cloud: {
-        type: 'String'
-        metadata: {
-          displayName: 'CrowdStrike Cloud'
-          description: 'CrowdStrike Cloud region'
-        }
-        defaultValue: 'autodiscover'
-      }
-      memberCid: {
-        type: 'String'
-        metadata: {
-          displayName: 'Member CID'
-          description: 'CrowdStrike Member CID'
-        }
-        defaultValue: ''
-      }
-      sensorUpdatePolicy: {
-        type: 'String'
-        metadata: {
-          displayName: 'Sensor Update Policy'
-          description: 'CrowdStrike Sensor Update Policy'
-        }
-        defaultValue: 'platform_default'
-      }
-      disableProxy: {
-        type: 'Boolean'
-        metadata: {
-          displayName: 'Disable Proxy'
-          description: 'Disable proxy settings'
-        }
-        defaultValue: false
-      }
-      provisioningToken: {
-        type: 'String'
-        metadata: {
-          displayName: 'Provisioning Token'
-          description: 'CrowdStrike Provisioning Token'
-        }
-        defaultValue: ''
-      }
-      proxyHost: {
-        type: 'String'
-        metadata: {
-          displayName: 'Proxy Host'
-          description: 'Proxy host configuration'
-        }
-        defaultValue: ''
-      }
-      proxyPort: {
-        type: 'String'
-        metadata: {
-          displayName: 'Proxy Port'
-          description: 'Proxy port configuration'
-        }
-        defaultValue: ''
-      }
-      tags: {
-        type: 'String'
-        metadata: {
-          displayName: 'Tags'
-          description: 'Comma-separated list of tags'
-        }
-        defaultValue: ''
-      }
-      handlerVersion: {
-        type: 'String'
-        metadata: {
-          displayName: 'Handler Version'
-          description: 'CrowdStrike Falcon extension handler version'
-        }
-        defaultValue: '0.0'
-      }
-      autoUpgradeMinorVersion: {
-        type: 'Boolean'
-        metadata: {
-          displayName: 'Auto Upgrade Minor Version'
-          description: 'Auto upgrade minor version for the CrowdStrike Falcon extension'
-        }
-        defaultValue: true
-      }
-    }
+    metadata: policyMetadata
+    parameters: commonParameters
     policyRule: {
       if: {
         allOf: [
@@ -212,48 +338,31 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
         effect: '[parameters(\'effect\')]'
         details: {
           type: 'Microsoft.Compute/virtualMachines/extensions'
-          roleDefinitionIds: [
-            tenantResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
-          ]
           existenceCondition: {
             allOf: [
-              {
-                field: 'Microsoft.Compute/virtualMachines/extensions/type'
-                equals: 'FalconSensorLinux'
-              }
               {
                 field: 'Microsoft.Compute/virtualMachines/extensions/publisher'
                 equals: 'Crowdstrike.Falcon'
               }
+              {
+                field: 'Microsoft.Compute/virtualMachines/extensions/type'
+                equals: 'FalconSensorLinux'
+              }
             ]
           }
+          roleDefinitionIds: [
+            tenantResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
+          ]
           deployment: {
             properties: {
               mode: 'incremental'
               template: {
                 '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
                 contentVersion: '1.0.0.0'
-                parameters: {
-                  vmName: { type: 'string' }
-                  location: { type: 'string' }
-                  clientId: { type: 'securestring' }
-                  clientSecret: { type: 'securestring' }
-                  accessToken: { type: 'securestring' }
-                  azureVaultName: { type: 'securestring' }
-                  cloud: { type: 'string' }
-                  memberCid: { type: 'string' }
-                  sensorUpdatePolicy: { type: 'string' }
-                  disableProxy: { type: 'bool' }
-                  provisioningToken: { type: 'securestring' }
-                  proxyHost: { type: 'string' }
-                  proxyPort: { type: 'string' }
-                  tags: { type: 'string' }
-                  handlerVersion: { type: 'string' }
-                  autoUpgradeMinorVersion: { type: 'bool' }
-                }
+                parameters: commonTemplateParameters
                 resources: [
                   {
-                    name: '[concat(parameters(\'vmName\'), \'/CrowdStrikeFalconSensor\')]'
+                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
                     type: 'Microsoft.Compute/virtualMachines/extensions'
                     location: '[parameters(\'location\')]'
                     apiVersion: '2021-07-01'
@@ -282,56 +391,7 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
                   }
                 ]
               }
-              parameters: {
-                vmName: {
-                  value: '[field(\'name\')]'
-                }
-                location: {
-                  value: '[field(\'location\')]'
-                }
-                clientId: {
-                  value: '[parameters(\'clientId\')]'
-                }
-                clientSecret: {
-                  value: '[parameters(\'clientSecret\')]'
-                }
-                accessToken: {
-                  value: '[parameters(\'accessToken\')]'
-                }
-                azureVaultName: {
-                  value: '[parameters(\'azureVaultName\')]'
-                }
-                cloud: {
-                  value: '[parameters(\'cloud\')]'
-                }
-                memberCid: {
-                  value: '[parameters(\'memberCid\')]'
-                }
-                sensorUpdatePolicy: {
-                  value: '[parameters(\'sensorUpdatePolicy\')]'
-                }
-                disableProxy: {
-                  value: '[parameters(\'disableProxy\')]'
-                }
-                provisioningToken: {
-                  value: '[parameters(\'provisioningToken\')]'
-                }
-                proxyHost: {
-                  value: '[parameters(\'proxyHost\')]'
-                }
-                proxyPort: {
-                  value: '[parameters(\'proxyPort\')]'
-                }
-                tags: {
-                  value: '[parameters(\'tags\')]'
-                }
-                handlerVersion: {
-                  value: '[parameters(\'handlerVersion\')]'
-                }
-                autoUpgradeMinorVersion: {
-                  value: '[parameters(\'autoUpgradeMinorVersion\')]'
-                }
-              }
+              parameters: commonTemplateParameterValues
             }
           }
         }
@@ -340,244 +400,135 @@ resource linuxPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-0
   }
 }
 
-// Create Linux policy assignment at management group level
-resource linuxPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'linux' || operatingSystemLower == 'both') {
-  name: 'CS-Falcon-Linux-MG'
-  location: deployment().location
-  identity: {
-    type: 'SystemAssigned'
-  }
+// Create Linux VMSS policy definition
+resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (operatingSystemLower == 'linux' || operatingSystemLower == 'both') {
+  name: '${linuxPolicyDefinitionName}-VMSS'
   properties: {
-    policyDefinitionId: linuxPolicyDefinition!.id
-    displayName: 'Deploy CrowdStrike Falcon sensor on Linux VMs (Management Group)'
-    description: 'This policy ensures CrowdStrike Falcon sensor is installed on all Linux VMs in the management group'
-    parameters: {
-      effect: {
-        value: policyEffect
+    displayName: 'Deploy CrowdStrike Falcon sensor on Linux VMSS'
+    description: 'This policy deploys CrowdStrike Falcon sensor on Linux Virtual Machine Scale Sets if not installed'
+    policyType: 'Custom'
+    mode: 'Indexed'
+    metadata: policyMetadata
+    parameters: commonParameters
+    policyRule: {
+      if: {
+        allOf: [
+          {
+            field: 'type'
+            equals: 'Microsoft.Compute/virtualMachineScaleSets'
+          }
+          {
+            field: 'Microsoft.Compute/virtualMachineScaleSets/virtualMachineProfile.osProfile.linuxConfiguration'
+            exists: 'true'
+          }
+        ]
       }
-      clientId: {
-        value: clientId
-      }
-      clientSecret: {
-        value: clientSecret
-      }
-      accessToken: {
-        value: accessToken
-      }
-      azureVaultName: {
-        value: azureVaultName
-      }
-      cloud: {
-        value: cloud
-      }
-      memberCid: {
-        value: memberCid
-      }
-      sensorUpdatePolicy: {
-        value: sensorUpdatePolicy
-      }
-      disableProxy: {
-        value: disableProxy
-      }
-      provisioningToken: {
-        value: provisioningToken
-      }
-      proxyHost: {
-        value: proxyHost
-      }
-      proxyPort: {
-        value: proxyPort
-      }
-      tags: {
-        value: tags
-      }
-      handlerVersion: {
-        value: handlerVersion
-      }
-      autoUpgradeMinorVersion: {
-        value: autoUpgradeMinorVersion
+      then: {
+        effect: '[parameters(\'effect\')]'
+        details: {
+          type: 'Microsoft.Compute/virtualMachineScaleSets/extensions'
+          existenceCondition: {
+            allOf: [
+              {
+                field: 'Microsoft.Compute/virtualMachineScaleSets/extensions/publisher'
+                equals: 'Crowdstrike.Falcon'
+              }
+              {
+                field: 'Microsoft.Compute/virtualMachineScaleSets/extensions/type'
+                equals: 'FalconSensorLinux'
+              }
+            ]
+          }
+          roleDefinitionIds: [
+            tenantResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
+          ]
+          deployment: {
+            properties: {
+              mode: 'incremental'
+              template: {
+                '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
+                contentVersion: '1.0.0.0'
+                parameters: commonTemplateParameters
+                resources: [
+                  {
+                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
+                    type: 'Microsoft.Compute/virtualMachineScaleSets/extensions'
+                    location: '[parameters(\'location\')]'
+                    apiVersion: '2021-07-01'
+                    properties: {
+                      publisher: 'Crowdstrike.Falcon'
+                      type: 'FalconSensorLinux'
+                      typeHandlerVersion: '[parameters(\'handlerVersion\')]'
+                      autoUpgradeMinorVersion: '[parameters(\'autoUpgradeMinorVersion\')]'
+                      settings: {
+                        cloud: '[parameters(\'cloud\')]'
+                        member_cid: '[parameters(\'memberCid\')]'
+                        sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
+                        disable_proxy: '[parameters(\'disableProxy\')]'
+                        proxy_host: '[parameters(\'proxyHost\')]'
+                        proxy_port: '[parameters(\'proxyPort\')]'
+                        tags: '[parameters(\'tags\')]'
+                      }
+                      protectedSettings: {
+                        client_id: '[parameters(\'clientId\')]'
+                        client_secret: '[parameters(\'clientSecret\')]'
+                        access_token: '[parameters(\'accessToken\')]'
+                        azure_vault_name: '[parameters(\'azureVaultName\')]'
+                        provisioning_token: '[parameters(\'provisioningToken\')]'
+                      }
+                    }
+                  }
+                ]
+              }
+              parameters: commonTemplateParameterValues
+            }
+          }
+        }
       }
     }
   }
 }
 
-// Create Windows policy definition
-resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (operatingSystemLower == 'windows' || operatingSystemLower == 'both') {
-  name: windowsPolicyDefinitionName
+// Create Linux VM policy assignment at management group level
+resource linuxVmPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'linux' || operatingSystemLower == 'both') {
+  name: 'CS-Falcon-Linux-VM-MG'
+  location: deployment().location
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    policyDefinitionId: linuxVmPolicyDefinition.id
+    displayName: 'Deploy CrowdStrike Falcon sensor on Linux VMs (Management Group)'
+    description: 'This policy ensures CrowdStrike Falcon sensor is installed on all Linux VMs in the management group'
+    parameters: commonLinuxAssignmentParameters
+  }
+}
+
+// Create Linux VMSS policy assignment at management group level
+resource linuxVmssPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'linux' || operatingSystemLower == 'both') {
+  name: 'CS-Falcon-Linux-VMSS-MG'
+  location: deployment().location
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    policyDefinitionId: linuxVmssPolicyDefinition.id
+    displayName: 'Deploy CrowdStrike Falcon sensor on Linux VMSS (Management Group)'
+    description: 'This policy ensures CrowdStrike Falcon sensor is installed on all Linux VMSS in the management group'
+    parameters: commonLinuxAssignmentParameters
+  }
+}
+
+// Create Windows VM policy definition
+resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (operatingSystemLower == 'windows' || operatingSystemLower == 'both') {
+  name: '${windowsPolicyDefinitionName}-VM'
   properties: {
     displayName: 'Deploy CrowdStrike Falcon sensor on Windows VMs'
     description: 'This policy deploys CrowdStrike Falcon sensor on Windows VMs if not installed'
     policyType: 'Custom'
     mode: 'Indexed'
-    metadata: {
-      category: 'Security'
-      version: '1.0.0'
-    }
-    parameters: {
-      effect: {
-        type: 'String'
-        metadata: {
-          displayName: 'Effect'
-          description: 'Enable or disable the execution of the policy'
-        }
-        allowedValues: [
-          'DeployIfNotExists'
-          'AuditIfNotExists'
-          'Disabled'
-        ]
-        defaultValue: 'DeployIfNotExists'
-      }
-      clientId: {
-        type: 'String'
-        metadata: {
-          displayName: 'CrowdStrike Client ID'
-          description: 'CrowdStrike API Client ID'
-        }
-      }
-      clientSecret: {
-        type: 'String'
-        metadata: {
-          displayName: 'CrowdStrike Client Secret'
-          description: 'CrowdStrike API Client Secret'
-        }
-      }
-      accessToken: {
-        type: 'String'
-        metadata: {
-          displayName: 'CrowdStrike Access Token'
-          description: 'CrowdStrike API Access Token'
-        }
-        defaultValue: ''
-      }
-      azureVaultName: {
-        type: 'String'
-        metadata: {
-          displayName: 'Azure Key Vault Name'
-          description: 'Azure Key Vault name containing CrowdStrike credentials'
-        }
-        defaultValue: ''
-      }
-      cloud: {
-        type: 'String'
-        metadata: {
-          displayName: 'CrowdStrike Cloud'
-          description: 'CrowdStrike Cloud region'
-        }
-        defaultValue: 'autodiscover'
-      }
-      memberCid: {
-        type: 'String'
-        metadata: {
-          displayName: 'Member CID'
-          description: 'CrowdStrike Member CID'
-        }
-        defaultValue: ''
-      }
-      sensorUpdatePolicy: {
-        type: 'String'
-        metadata: {
-          displayName: 'Sensor Update Policy'
-          description: 'CrowdStrike Sensor Update Policy'
-        }
-        defaultValue: 'platform_default'
-      }
-      disableProxy: {
-        type: 'Boolean'
-        metadata: {
-          displayName: 'Disable Proxy'
-          description: 'Disable proxy settings'
-        }
-        defaultValue: false
-      }
-      provisioningToken: {
-        type: 'String'
-        metadata: {
-          displayName: 'Provisioning Token'
-          description: 'CrowdStrike Provisioning Token'
-        }
-        defaultValue: ''
-      }
-      proxyHost: {
-        type: 'String'
-        metadata: {
-          displayName: 'Proxy Host'
-          description: 'Proxy host configuration'
-        }
-        defaultValue: ''
-      }
-      proxyPort: {
-        type: 'String'
-        metadata: {
-          displayName: 'Proxy Port'
-          description: 'Proxy port configuration'
-        }
-        defaultValue: ''
-      }
-      tags: {
-        type: 'String'
-        metadata: {
-          displayName: 'Tags'
-          description: 'Comma-separated list of tags'
-        }
-        defaultValue: ''
-      }
-      pacUrl: {
-        type: 'String'
-        metadata: {
-          displayName: 'PAC URL'
-          description: 'PAC URL for Windows'
-        }
-        defaultValue: ''
-      }
-      disableProvisioningWait: {
-        type: 'Boolean'
-        metadata: {
-          displayName: 'Disable Provisioning Wait'
-          description: 'Disable provisioning wait for Windows'
-        }
-        defaultValue: false
-      }
-      disableStart: {
-        type: 'Boolean'
-        metadata: {
-          displayName: 'Disable Start'
-          description: 'Disable start for Windows'
-        }
-        defaultValue: false
-      }
-      provisioningWaitTime: {
-        type: 'String'
-        metadata: {
-          displayName: 'Provisioning Wait Time'
-          description: 'Provisioning wait time for Windows'
-        }
-        defaultValue: '1200000'
-      }
-      vdi: {
-        type: 'Boolean'
-        metadata: {
-          displayName: 'VDI'
-          description: 'VDI setting for Windows'
-        }
-        defaultValue: false
-      }
-      handlerVersion: {
-        type: 'String'
-        metadata: {
-          displayName: 'Handler Version'
-          description: 'CrowdStrike Falcon extension handler version'
-        }
-        defaultValue: '0.0'
-      }
-      autoUpgradeMinorVersion: {
-        type: 'Boolean'
-        metadata: {
-          displayName: 'Auto Upgrade Minor Version'
-          description: 'Auto upgrade minor version for the CrowdStrike Falcon extension'
-        }
-        defaultValue: true
-      }
-    }
+    metadata: policyMetadata
+    parameters: union(commonParameters, windowsSpecificParameters)
     policyRule: {
       if: {
         allOf: [
@@ -595,53 +546,31 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
         effect: '[parameters(\'effect\')]'
         details: {
           type: 'Microsoft.Compute/virtualMachines/extensions'
-          roleDefinitionIds: [
-            tenantResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
-          ]
           existenceCondition: {
             allOf: [
-              {
-                field: 'Microsoft.Compute/virtualMachines/extensions/type'
-                equals: 'FalconSensorWindows'
-              }
               {
                 field: 'Microsoft.Compute/virtualMachines/extensions/publisher'
                 equals: 'Crowdstrike.Falcon'
               }
+              {
+                field: 'Microsoft.Compute/virtualMachines/extensions/type'
+                equals: 'FalconSensorWindows'
+              }
             ]
           }
+          roleDefinitionIds: [
+            tenantResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
+          ]
           deployment: {
             properties: {
               mode: 'incremental'
               template: {
                 '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
                 contentVersion: '1.0.0.0'
-                parameters: {
-                  vmName: { type: 'string' }
-                  location: { type: 'string' }
-                  clientId: { type: 'securestring' }
-                  clientSecret: { type: 'securestring' }
-                  accessToken: { type: 'securestring' }
-                  azureVaultName: { type: 'securestring' }
-                  cloud: { type: 'string' }
-                  memberCid: { type: 'string' }
-                  sensorUpdatePolicy: { type: 'string' }
-                  disableProxy: { type: 'bool' }
-                  provisioningToken: { type: 'securestring' }
-                  proxyHost: { type: 'string' }
-                  proxyPort: { type: 'string' }
-                  tags: { type: 'string' }
-                  pacUrl: { type: 'string' }
-                  disableProvisioningWait: { type: 'bool' }
-                  disableStart: { type: 'bool' }
-                  provisioningWaitTime: { type: 'string' }
-                  vdi: { type: 'bool' }
-                  handlerVersion: { type: 'string' }
-                  autoUpgradeMinorVersion: { type: 'bool' }
-                }
+                parameters: windowsTemplateParameters
                 resources: [
                   {
-                    name: '[concat(parameters(\'vmName\'), \'/CrowdStrikeFalconSensor\')]'
+                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
                     type: 'Microsoft.Compute/virtualMachines/extensions'
                     location: '[parameters(\'location\')]'
                     apiVersion: '2021-07-01'
@@ -675,71 +604,7 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                   }
                 ]
               }
-              parameters: {
-                vmName: {
-                  value: '[field(\'name\')]'
-                }
-                location: {
-                  value: '[field(\'location\')]'
-                }
-                clientId: {
-                  value: '[parameters(\'clientId\')]'
-                }
-                clientSecret: {
-                  value: '[parameters(\'clientSecret\')]'
-                }
-                accessToken: {
-                  value: '[parameters(\'accessToken\')]'
-                }
-                azureVaultName: {
-                  value: '[parameters(\'azureVaultName\')]'
-                }
-                cloud: {
-                  value: '[parameters(\'cloud\')]'
-                }
-                memberCid: {
-                  value: '[parameters(\'memberCid\')]'
-                }
-                sensorUpdatePolicy: {
-                  value: '[parameters(\'sensorUpdatePolicy\')]'
-                }
-                disableProxy: {
-                  value: '[parameters(\'disableProxy\')]'
-                }
-                provisioningToken: {
-                  value: '[parameters(\'provisioningToken\')]'
-                }
-                proxyHost: {
-                  value: '[parameters(\'proxyHost\')]'
-                }
-                proxyPort: {
-                  value: '[parameters(\'proxyPort\')]'
-                }
-                tags: {
-                  value: '[parameters(\'tags\')]'
-                }
-                pacUrl: {
-                  value: '[parameters(\'pacUrl\')]'
-                }
-                disableProvisioningWait: {
-                  value: '[parameters(\'disableProvisioningWait\')]'
-                }
-                disableStart: {
-                  value: '[parameters(\'disableStart\')]'
-                }
-                provisioningWaitTime: {
-                  value: '[parameters(\'provisioningWaitTime\')]'
-                }
-                vdi: {
-                  value: '[parameters(\'vdi\')]'
-                }
-                handlerVersion: {
-                  value: '[parameters(\'handlerVersion\')]'
-                }
-                autoUpgradeMinorVersion: {
-                  value: '[parameters(\'autoUpgradeMinorVersion\')]'
-                }
-              }
+              parameters: windowsTemplateParameterValues
             }
           }
         }
@@ -748,107 +613,179 @@ resource windowsPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
   }
 }
 
-// Create Windows policy assignment at management group level
-resource windowsPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'windows' || operatingSystemLower == 'both') {
-  name: 'CS-Falcon-Win-MG'
-  location: deployment().location
-  identity: {
-    type: 'SystemAssigned'
-  }
+// Create Windows VMSS policy definition
+resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (operatingSystemLower == 'windows' || operatingSystemLower == 'both') {
+  name: '${windowsPolicyDefinitionName}-VMSS'
   properties: {
-    policyDefinitionId: windowsPolicyDefinition!.id
-    displayName: 'Deploy CrowdStrike Falcon sensor on Windows VMs (Management Group)'
-    description: 'This policy ensures CrowdStrike Falcon sensor is installed on all Windows VMs in the management group'
-    parameters: {
-      effect: {
-        value: policyEffect
+    displayName: 'Deploy CrowdStrike Falcon sensor on Windows VMSS'
+    description: 'This policy deploys CrowdStrike Falcon sensor on Windows Virtual Machine Scale Sets if not installed'
+    policyType: 'Custom'
+    mode: 'Indexed'
+    metadata: policyMetadata
+    parameters: union(commonParameters, windowsSpecificParameters)
+    policyRule: {
+      if: {
+        allOf: [
+          {
+            field: 'type'
+            equals: 'Microsoft.Compute/virtualMachineScaleSets'
+          }
+          {
+            field: 'Microsoft.Compute/virtualMachineScaleSets/virtualMachineProfile.osProfile.windowsConfiguration'
+            exists: 'true'
+          }
+        ]
       }
-      clientId: {
-        value: clientId
-      }
-      clientSecret: {
-        value: clientSecret
-      }
-      accessToken: {
-        value: accessToken
-      }
-      azureVaultName: {
-        value: azureVaultName
-      }
-      cloud: {
-        value: cloud
-      }
-      memberCid: {
-        value: memberCid
-      }
-      sensorUpdatePolicy: {
-        value: sensorUpdatePolicy
-      }
-      disableProxy: {
-        value: disableProxy
-      }
-      provisioningToken: {
-        value: provisioningToken
-      }
-      proxyHost: {
-        value: proxyHost
-      }
-      proxyPort: {
-        value: proxyPort
-      }
-      tags: {
-        value: tags
-      }
-      pacUrl: {
-        value: pacUrl
-      }
-      disableProvisioningWait: {
-        value: disableProvisioningWait
-      }
-      disableStart: {
-        value: disableStart
-      }
-      provisioningWaitTime: {
-        value: provisioningWaitTime
-      }
-      vdi: {
-        value: vdi
-      }
-      handlerVersion: {
-        value: handlerVersion
-      }
-      autoUpgradeMinorVersion: {
-        value: autoUpgradeMinorVersion
+      then: {
+        effect: '[parameters(\'effect\')]'
+        details: {
+          type: 'Microsoft.Compute/virtualMachineScaleSets/extensions'
+          existenceCondition: {
+            allOf: [
+              {
+                field: 'Microsoft.Compute/virtualMachineScaleSets/extensions/publisher'
+                equals: 'Crowdstrike.Falcon'
+              }
+              {
+                field: 'Microsoft.Compute/virtualMachineScaleSets/extensions/type'
+                equals: 'FalconSensorWindows'
+              }
+            ]
+          }
+          roleDefinitionIds: [
+            tenantResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
+          ]
+          deployment: {
+            properties: {
+              mode: 'incremental'
+              template: {
+                '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
+                contentVersion: '1.0.0.0'
+                parameters: windowsTemplateParameters
+                resources: [
+                  {
+                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
+                    type: 'Microsoft.Compute/virtualMachineScaleSets/extensions'
+                    location: '[parameters(\'location\')]'
+                    apiVersion: '2021-07-01'
+                    properties: {
+                      publisher: 'Crowdstrike.Falcon'
+                      type: 'FalconSensorWindows'
+                      typeHandlerVersion: '[parameters(\'handlerVersion\')]'
+                      autoUpgradeMinorVersion: '[parameters(\'autoUpgradeMinorVersion\')]'
+                      settings: {
+                        cloud: '[parameters(\'cloud\')]'
+                        member_cid: '[parameters(\'memberCid\')]'
+                        sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
+                        disable_proxy: '[parameters(\'disableProxy\')]'
+                        proxy_host: '[parameters(\'proxyHost\')]'
+                        proxy_port: '[parameters(\'proxyPort\')]'
+                        tags: '[parameters(\'tags\')]'
+                        pac_url: '[parameters(\'pacUrl\')]'
+                        disable_provisioning_wait: '[parameters(\'disableProvisioningWait\')]'
+                        disable_start: '[parameters(\'disableStart\')]'
+                        provisioning_wait_time: '[parameters(\'provisioningWaitTime\')]'
+                        vdi: '[parameters(\'vdi\')]'
+                      }
+                      protectedSettings: {
+                        client_id: '[parameters(\'clientId\')]'
+                        client_secret: '[parameters(\'clientSecret\')]'
+                        access_token: '[parameters(\'accessToken\')]'
+                        azure_vault_name: '[parameters(\'azureVaultName\')]'
+                        provisioning_token: '[parameters(\'provisioningToken\')]'
+                      }
+                    }
+                  }
+                ]
+              }
+              parameters: windowsTemplateParameterValues
+            }
+          }
+        }
       }
     }
   }
 }
 
+// Create Windows VM policy assignment at management group level
+resource windowsVmPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'windows' || operatingSystemLower == 'both') {
+  name: 'CS-Falcon-Windows-VM-MG'
+  location: deployment().location
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    policyDefinitionId: windowsVmPolicyDefinition.id
+    displayName: 'Deploy CrowdStrike Falcon sensor on Windows VMs (Management Group)'
+    description: 'This policy ensures CrowdStrike Falcon sensor is installed on all Windows VMs in the management group'
+    parameters: commonWindowsAssignmentParameters
+  }
+}
+
+// Create Windows VMSS policy assignment at management group level
+resource windowsVmssPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'windows' || operatingSystemLower == 'both') {
+  name: 'CS-Falcon-Windows-VMSS-MG'
+  location: deployment().location
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    policyDefinitionId: windowsVmssPolicyDefinition.id
+    displayName: 'Deploy CrowdStrike Falcon sensor on Windows VMSS (Management Group)'
+    description: 'This policy ensures CrowdStrike Falcon sensor is installed on all Windows VMSS in the management group'
+    parameters: commonWindowsAssignmentParameters
+  }
+}
+
 // Create role assignments for the policies' managed identities (at management group scope)
 resource linuxVmContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
-  name: guid(linuxPolicyAssignment!.id, vmRoleDefinitionId, managementGroup().id, 'Linux')
+  name: guid(linuxVmPolicyAssignment.id, vmRoleDefinitionId, managementGroup().id, 'LinuxVM')
   properties: {
-    principalId: linuxPolicyAssignment!.identity.principalId
+    principalId: linuxVmPolicyAssignment!.identity.principalId
+    roleDefinitionId: tenantResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource linuxVmssContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
+  name: guid(linuxVmssPolicyAssignment.id, vmRoleDefinitionId, managementGroup().id, 'LinuxVMSS')
+  properties: {
+    principalId: linuxVmssPolicyAssignment!.identity.principalId
     roleDefinitionId: tenantResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
     principalType: 'ServicePrincipal'
   }
 }
 
 resource windowsVmContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
-  name: guid(windowsPolicyAssignment!.id, vmRoleDefinitionId, managementGroup().id, 'Windows')
+  name: guid(windowsVmPolicyAssignment.id, vmRoleDefinitionId, managementGroup().id, 'WindowsVM')
   properties: {
-    principalId: windowsPolicyAssignment!.identity.principalId
+    principalId: windowsVmPolicyAssignment!.identity.principalId
+    roleDefinitionId: tenantResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource windowsVmssContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
+  name: guid(windowsVmssPolicyAssignment.id, vmRoleDefinitionId, managementGroup().id, 'WindowsVMSS')
+  properties: {
+    principalId: windowsVmssPolicyAssignment!.identity.principalId
     roleDefinitionId: tenantResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
     principalType: 'ServicePrincipal'
   }
 }
 
 // Outputs
-output linuxPolicyDefinitionId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxPolicyDefinition!.id : ''
-output windowsPolicyDefinitionId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsPolicyDefinition!.id : ''
-output linuxPolicyAssignmentId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxPolicyAssignment!.id : ''
-output windowsPolicyAssignmentId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsPolicyAssignment!.id : ''
-output linuxPolicyPrincipalId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxPolicyAssignment!.identity.principalId : ''
-output windowsPolicyPrincipalId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsPolicyAssignment!.identity.principalId : ''
+output linuxVmPolicyDefinitionId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmPolicyDefinition.id : ''
+output linuxVmssPolicyDefinitionId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmssPolicyDefinition.id : ''
+output windowsVmPolicyDefinitionId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsVmPolicyDefinition.id : ''
+output windowsVmssPolicyDefinitionId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsVmssPolicyDefinition.id : ''
+output linuxVmPolicyAssignmentId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmPolicyAssignment.id : ''
+output linuxVmssPolicyAssignmentId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmssPolicyAssignment.id : ''
+output windowsVmPolicyAssignmentId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsVmPolicyAssignment.id : ''
+output windowsVmssPolicyAssignmentId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsVmssPolicyAssignment.id : ''
+output linuxVmPolicyPrincipalId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmPolicyAssignment!.identity.principalId : ''
+output linuxVmssPolicyPrincipalId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmssPolicyAssignment!.identity.principalId : ''
+output windowsVmPolicyPrincipalId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsVmPolicyAssignment!.identity.principalId : ''
+output windowsVmssPolicyPrincipalId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsVmssPolicyAssignment!.identity.principalId : ''
 output managementGroupId string = managementGroup().id
 output managementGroupName string = managementGroup().name
