@@ -30,7 +30,8 @@
     "small": "Icons\\small.png",
     "medium": "Icons\\medium.png",
     "large": "Icons\\large.png",
-    "wide": "Icons\\wide.png"
+    "wide": "Icons\\wide.png",
+    "hero": "Icons\\hero.png"
   },
   "links": [
     {
