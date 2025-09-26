@@ -1,6 +1,6 @@
 {
   "$schema": "https://gallery.azure.com/schemas/2015-04-01/manifest.json#",
-  "name": "crowdstrike-falcon-linux",
+  "name": "FalconSensor-linux-arm",
   "publisher": "CrowdStrike",
   "version": "0.0.1",
   "displayName": "ms-resource:displayName",

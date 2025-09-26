@@ -86,7 +86,7 @@
             "toolTip": "Name of the Azure Key Vault containing CrowdStrike API credentials",
             "constraints": {
               "required": "[equals(elements('apiAuthSection').authType, 'vault')]",
-              "regex": "^[a-zA-Z0-9-]+$",
+              "regex": "^[a-zA-Z0-9-]*$",
               "validationMessage": "Key Vault name can only contain letters, numbers, and hyphens"
             },
             "visible": "[equals(elements('apiAuthSection').authType, 'vault')]"
@@ -165,12 +165,17 @@
         "elements": [
           {
             "name": "provisioningToken",
-            "type": "Microsoft.Common.TextBox",
-            "label": "Provisioning Token",
+            "type": "Microsoft.Common.PasswordBox",
+            "label": {
+              "password": "Token"
+            },
             "defaultValue": "",
             "toolTip": "The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token",
             "constraints": {
               "required": false
+            },
+            "options": {
+              "hideConfirmation": true
             }
           }
         ]
@@ -288,9 +293,9 @@
       "vmName": "[vmName()]",
       "location": "[location()]",
       "access-token": "[elements('apiAuthSection').accessToken]",
-      "azure-vault-name": "[elements('apiAuthSection').azureVaultName]",
       "client-id": "[elements('apiAuthSection').clientId]",
       "client-secret": "[elements('apiAuthSection').clientSecret]",
+      "azure-vault-name": "[elements('apiAuthSection').azureVaultName]",
       "cloud": "[elements('cloudSection').cloud]",
       "member-cid": "[elements('apiAuthSection').memberCid]",
       "sensor-update-policy": "[elements('sensorVersionSection').sensorUpdatePolicy]",
