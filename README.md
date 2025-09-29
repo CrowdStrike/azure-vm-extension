@@ -90,7 +90,6 @@ These parameters contain sensitive information and **must** be placed in the `pr
 | `client_id` | CrowdStrike API Client ID | Yes* |
 | `client_secret` | CrowdStrike API Client Secret | Yes* |
 | `access_token` | CrowdStrike API Access Token (alternative to client_id/client_secret) | Yes* |
-| `azure_vault_name` | Azure Key Vault name containing CrowdStrike credentials | Yes* |
 | `provisioning_token` | Installation token (if required by your environment) | No |
 
 *One of the following authentication methods is required:
@@ -103,6 +102,8 @@ These parameters contain sensitive information and **must** be placed in the `pr
 > The extension will fail to install if the VM doesn't have the required permissions to access the secrets.
 > Any secrets in the vault should be prefixed with `FALCON-` e.g. FALCON-CLIENT-ID, FALCON-CLIENT-SECRET, FALCON-ACCESS-TOKEN, etc.
 >
+> When using `azure_vault_name` with `azure_managed_identity_client_id`, the extension will use the specified user-assigned managed identity to authenticate with the Key Vault instead of the VM's system-assigned managed identity. This provides more granular control over Key Vault access permissions and is useful in scenarios where you want to use a specific managed identity for Key Vault authentication.
+>
 > If you choose to use Azure Key Vault with ARM templates, you do not have to specify `azure_vault_name` or give VMs access to the vault.
 > See [Using Key Vault with ARM Templates](#using-azure-key-vault-with-arm-templates) for details on using Key Vault with ARM templates.
 
@@ -113,6 +114,8 @@ These configuration parameters can be placed in the `settings` section:
 #### Common Settings (Linux and Windows)
 | Parameter | Description | Default |
 |-----------|-------------|---------|
+| `azure_vault_name` | Azure Key Vault name containing CrowdStrike credentials | None |
+| `azure_managed_identity_client_id` | Azure Managed Identity Client ID for Key Vault access (used with azure_vault_name) | None |
 | `cloud` | CrowdStrike cloud region (us-1, us-2, eu-1, us-gov-1, autodiscover) | autodiscover |
 | `member_cid` | Member CID for MSSP scenarios | None |
 | `sensor_update_policy` | Sensor update policy name | platform_default |

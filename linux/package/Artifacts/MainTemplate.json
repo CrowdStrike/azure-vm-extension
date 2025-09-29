@@ -98,6 +98,13 @@
       "metadata": {
         "description": "A comma separated list of tags for sensor grouping"
       }
+    },
+    "azure-managed-identity-client-id": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure User Assigned Managed Identity Client ID for Key Vault access"
+      }
     }
   },
   "variables": {
@@ -119,6 +126,7 @@
         "autoUpgradeMinorVersion": true,
         "settings": {
           "azure_vault_name": "[parameters('azure-vault-name')]",
+          "azure_managed_identity_client_id": "[parameters('azure-managed-identity-client-id')]",
           "cloud": "[parameters('cloud')]",
           "member_cid": "[parameters('member-cid')]",
           "sensor_update_policy": "[parameters('sensor-update-policy')]",
