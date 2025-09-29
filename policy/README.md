@@ -240,7 +240,8 @@ See https://github.com/CrowdStrike/azure-vm-extension?tab=readme-ov-file#falcon-
 | `clientId` | string | OAuth2 Client ID | '' |
 | `clientSecret` | securestring | OAuth2 Client Secret | '' |
 | `accessToken` | securestring | API Access Token | '' |
-| `azureVaultName` | securestring | Azure Key Vault name containing CrowdStrike credentials | '' |
+| `azureVaultName` | string | Azure Key Vault name containing CrowdStrike credentials | '' |
+| `azureManagedIdentityClientId` | string | Azure Managed Identity Client ID for Key Vault access | '' |
 | `cloud` | string | Falcon Cloud (us-1, us-2, eu-1, us-gov-1) | 'autodiscover' |
 | `memberCid` | string | Member CID for MSSP | '' |
 | `sensorUpdatePolicy` | string | Sensor update policy name | 'platform_default' |
@@ -252,6 +253,8 @@ See https://github.com/CrowdStrike/azure-vm-extension?tab=readme-ov-file#falcon-
 > When specifying the Azure vault with `azure_vault_name`, make sure that all VMs have the appropriate permissions to list and get the Key Vault secrets.
 > The extension will fail to install if the VM doesn't have the required permissions to access the secrets.
 > Any secrets in the vault should be prefixed with `FALCON-` e.g. FALCON-CLIENT-ID, FALCON-CLIENT-SECRET, FALCON-ACCESS-TOKEN, etc.
+>
+> When using `azure_vault_name` with `azure_managed_identity_client_id`, the extension will use the specified user-assigned managed identity to authenticate with the Key Vault instead of the VM's system-assigned managed identity. This provides more granular control over Key Vault access permissions and is useful in scenarios where you want to use a specific managed identity for Key Vault authentication.
 
 ### Windows-Specific Parameters
 | Parameter | Type | Description | Default |

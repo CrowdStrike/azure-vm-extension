@@ -35,7 +35,6 @@ param clientId string = ''
 param clientSecret string = ''
 @secure()
 param accessToken string = ''
-@secure()
 param azureVaultName string = ''
 param cloud string = 'autodiscover'
 param memberCid string = ''
@@ -43,6 +42,7 @@ param sensorUpdatePolicy string = 'platform_default'
 param disableProxy bool = false
 @secure()
 param provisioningToken string = ''
+param azureManagedIdentityClientId string = ''
 param proxyHost string = ''
 param proxyPort string = ''
 param tags string = ''
@@ -103,6 +103,14 @@ var commonParameters = {
     metadata: {
       displayName: 'Azure Key Vault Name'
       description: 'Azure Key Vault name for credential storage'
+    }
+    defaultValue: ''
+  }
+  azureManagedIdentityClientId: {
+    type: 'String'
+    metadata: {
+      displayName: 'Azure Managed Identity Client ID'
+      description: 'Azure User Assigned Managed Identity Client ID for Key Vault access'
     }
     defaultValue: ''
   }
@@ -237,7 +245,8 @@ var commonTemplateParameters = {
   clientId: { type: 'securestring' }
   clientSecret: { type: 'securestring' }
   accessToken: { type: 'securestring' }
-  azureVaultName: { type: 'securestring' }
+  azureVaultName: { type: 'string' }
+  azureManagedIdentityClientId: { type: 'string' }
   cloud: { type: 'string' }
   memberCid: { type: 'string' }
   sensorUpdatePolicy: { type: 'string' }
@@ -265,6 +274,7 @@ var commonTemplateParameterValues = {
   clientSecret: { value: '[parameters(\'clientSecret\')]' }
   accessToken: { value: '[parameters(\'accessToken\')]' }
   azureVaultName: { value: '[parameters(\'azureVaultName\')]' }
+  azureManagedIdentityClientId: { value: '[parameters(\'azureManagedIdentityClientId\')]' }
   cloud: { value: '[parameters(\'cloud\')]' }
   memberCid: { value: '[parameters(\'memberCid\')]' }
   sensorUpdatePolicy: { value: '[parameters(\'sensorUpdatePolicy\')]' }
@@ -291,6 +301,7 @@ var commonLinuxAssignmentParameters = {
   clientSecret: { value: clientSecret }
   accessToken: { value: accessToken }
   azureVaultName: { value: azureVaultName }
+  azureManagedIdentityClientId: { value: azureManagedIdentityClientId }
   cloud: { value: cloud }
   memberCid: { value: memberCid }
   sensorUpdatePolicy: { value: sensorUpdatePolicy }
@@ -372,6 +383,8 @@ resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                       typeHandlerVersion: '[parameters(\'handlerVersion\')]'
                       autoUpgradeMinorVersion: '[parameters(\'autoUpgradeMinorVersion\')]'
                       settings: {
+                        azure_vault_name: '[parameters(\'azureVaultName\')]'
+                        azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
                         cloud: '[parameters(\'cloud\')]'
                         member_cid: '[parameters(\'memberCid\')]'
                         sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
@@ -384,7 +397,6 @@ resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                         client_id: '[parameters(\'clientId\')]'
                         client_secret: '[parameters(\'clientSecret\')]'
                         access_token: '[parameters(\'accessToken\')]'
-                        azure_vault_name: '[parameters(\'azureVaultName\')]'
                         provisioning_token: '[parameters(\'provisioningToken\')]'
                       }
                     }
@@ -461,6 +473,8 @@ resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                       typeHandlerVersion: '[parameters(\'handlerVersion\')]'
                       autoUpgradeMinorVersion: '[parameters(\'autoUpgradeMinorVersion\')]'
                       settings: {
+                        azure_vault_name: '[parameters(\'azureVaultName\')]'
+                        azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
                         cloud: '[parameters(\'cloud\')]'
                         member_cid: '[parameters(\'memberCid\')]'
                         sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
@@ -473,7 +487,6 @@ resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                         client_id: '[parameters(\'clientId\')]'
                         client_secret: '[parameters(\'clientSecret\')]'
                         access_token: '[parameters(\'accessToken\')]'
-                        azure_vault_name: '[parameters(\'azureVaultName\')]'
                         provisioning_token: '[parameters(\'provisioningToken\')]'
                       }
                     }
@@ -580,6 +593,8 @@ resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                       typeHandlerVersion: '[parameters(\'handlerVersion\')]'
                       autoUpgradeMinorVersion: '[parameters(\'autoUpgradeMinorVersion\')]'
                       settings: {
+                        azure_vault_name: '[parameters(\'azureVaultName\')]'
+                        azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
                         cloud: '[parameters(\'cloud\')]'
                         member_cid: '[parameters(\'memberCid\')]'
                         sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
@@ -597,7 +612,6 @@ resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                         client_id: '[parameters(\'clientId\')]'
                         client_secret: '[parameters(\'clientSecret\')]'
                         access_token: '[parameters(\'accessToken\')]'
-                        azure_vault_name: '[parameters(\'azureVaultName\')]'
                         provisioning_token: '[parameters(\'provisioningToken\')]'
                       }
                     }
@@ -674,6 +688,8 @@ resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@
                       typeHandlerVersion: '[parameters(\'handlerVersion\')]'
                       autoUpgradeMinorVersion: '[parameters(\'autoUpgradeMinorVersion\')]'
                       settings: {
+                        azure_vault_name: '[parameters(\'azureVaultName\')]'
+                        azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
                         cloud: '[parameters(\'cloud\')]'
                         member_cid: '[parameters(\'memberCid\')]'
                         sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
@@ -691,7 +707,6 @@ resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@
                         client_id: '[parameters(\'clientId\')]'
                         client_secret: '[parameters(\'clientSecret\')]'
                         access_token: '[parameters(\'accessToken\')]'
-                        azure_vault_name: '[parameters(\'azureVaultName\')]'
                         provisioning_token: '[parameters(\'provisioningToken\')]'
                       }
                     }

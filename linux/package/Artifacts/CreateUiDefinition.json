@@ -92,6 +92,18 @@
             "visible": "[equals(elements('apiAuthSection').authType, 'vault')]"
           },
           {
+            "name": "azureManagedIdentityClientId",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Managed Identity Client ID",
+            "toolTip": "Client ID of the Azure User Assigned Managed Identity for Key Vault access",
+            "constraints": {
+              "required": false,
+              "regex": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "validationMessage": "Please enter a valid UUID format for the Managed Identity Client ID"
+            },
+            "visible": "[equals(elements('apiAuthSection').authType, 'vault')]"
+          },
+          {
             "name": "memberCid",
             "type": "Microsoft.Common.TextBox",
             "label": "Member CID (MSSP)",
@@ -242,6 +254,7 @@
       "client-id": "[elements('apiAuthSection').clientId]",
       "client-secret": "[elements('apiAuthSection').clientSecret]",
       "azure-vault-name": "[elements('apiAuthSection').azureVaultName]",
+      "azure-managed-identity-client-id": "[elements('apiAuthSection').azureManagedIdentityClientId]",
       "cloud": "[elements('cloudSection').cloud]",
       "member-cid": "[elements('apiAuthSection').memberCid]",
       "sensor-update-policy": "[elements('sensorVersionSection').sensorUpdatePolicy]",
