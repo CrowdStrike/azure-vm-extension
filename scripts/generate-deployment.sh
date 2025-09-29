@@ -195,7 +195,7 @@ generate_deployment() {
         internal_extension="true"
     else
         # For publish mode, use provided regions or default
-        local default_array='["Central US EUAP", "West Central US"]'
+        local default_array='["*"]'
         regions=$(format_regions "$REGIONS" "$default_array")
         internal_extension="false"
     fi
