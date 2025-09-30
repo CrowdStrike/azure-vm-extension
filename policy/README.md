@@ -248,6 +248,22 @@ See https://github.com/CrowdStrike/azure-vm-extension?tab=readme-ov-file#falcon-
 | `tags` | string | Comma-separated sensor tags | '' |
 | `policyEffect` | string | Policy effect | 'DeployIfNotExists' |
 | `createRoleAssignments` | bool | Create role assignments for managed identities | true |
+| `proxySettings` | object | Network proxy configuration settings | `{proxyHost: '', proxyPort: ''}` |
+| `extensionSettings` | object | Extension configuration settings | `{handlerVersion: 'Latest release version', autoUpgradeMinorVersion: true}` |
+
+### Object Parameter Details
+
+#### `proxySettings` Object
+| Property | Type | Description | Default |
+|----------|------|-------------|---------|
+| `proxyHost` | string | HTTP proxy host | '' |
+| `proxyPort` | string | HTTP proxy port | '' |
+
+#### `extensionSettings` Object
+| Property | Type | Description | Default |
+|----------|------|-------------|---------|
+| `handlerVersion` | string | Extension handler version (automatically updated with releases) | Latest release version |
+| `autoUpgradeMinorVersion` | bool | Enable automatic minor version upgrades | true |
 
 > [!IMPORTANT]
 > When specifying the Azure vault with `azure_vault_name`, make sure that all VMs have the appropriate permissions to list and get the Key Vault secrets.
