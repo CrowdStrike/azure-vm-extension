@@ -22,11 +22,11 @@ param policyEffect string = 'DeployIfNotExists'
 @description('Create role assignments for policy managed identities (requires Owner or User Access Administrator role)')
 param createRoleAssignments bool = true
 
-@description('Handler version for the CrowdStrike Falcon extension')
-param handlerVersion string = '0.0'
-
-@description('Auto upgrade minor version for the CrowdStrike Falcon extension')
-param autoUpgradeMinorVersion bool = true
+@description('Extension configuration settings')
+param extensionSettings object = {
+  handlerVersion: '0.0'
+  autoUpgradeMinorVersion: true
+}
 
 // CrowdStrike Parameters
 @secure()
@@ -43,8 +43,10 @@ param disableProxy bool = false
 @secure()
 param provisioningToken string = ''
 param azureManagedIdentityClientId string = ''
-param proxyHost string = ''
-param proxyPort string = ''
+param proxySettings object = {
+  proxyHost: ''
+  proxyPort: ''
+}
 param tags string = ''
 param pacUrl string = ''
 param disableProvisioningWait bool = false
@@ -154,21 +156,16 @@ var commonParameters = {
     }
     defaultValue: ''
   }
-  proxyHost: {
-    type: 'String'
+  proxySettings: {
+    type: 'Object'
     metadata: {
-      displayName: 'Proxy Host'
-      description: 'Proxy host configuration'
+      displayName: 'Proxy Settings'
+      description: 'Network proxy configuration settings'
     }
-    defaultValue: ''
-  }
-  proxyPort: {
-    type: 'String'
-    metadata: {
-      displayName: 'Proxy Port'
-      description: 'Proxy port configuration'
+    defaultValue: {
+      proxyHost: ''
+      proxyPort: ''
     }
-    defaultValue: ''
   }
   tags: {
     type: 'String'
@@ -178,21 +175,16 @@ var commonParameters = {
     }
     defaultValue: ''
   }
-  handlerVersion: {
-    type: 'String'
+  extensionSettings: {
+    type: 'Object'
     metadata: {
-      displayName: 'Handler Version'
-      description: 'CrowdStrike Falcon extension handler version'
+      displayName: 'Extension Settings'
+      description: 'CrowdStrike Falcon extension configuration settings'
     }
-    defaultValue: '0.0'
-  }
-  autoUpgradeMinorVersion: {
-    type: 'Boolean'
-    metadata: {
-      displayName: 'Auto Upgrade Minor Version'
-      description: 'Auto upgrade minor version for the CrowdStrike Falcon extension'
+    defaultValue: {
+      handlerVersion: '0.0'
+      autoUpgradeMinorVersion: true
     }
-    defaultValue: true
   }
 }
 
@@ -252,11 +244,9 @@ var commonTemplateParameters = {
   sensorUpdatePolicy: { type: 'string' }
   disableProxy: { type: 'bool' }
   provisioningToken: { type: 'securestring' }
-  proxyHost: { type: 'string' }
-  proxyPort: { type: 'string' }
+  proxySettings: { type: 'object' }
   tags: { type: 'string' }
-  handlerVersion: { type: 'string' }
-  autoUpgradeMinorVersion: { type: 'bool' }
+  extensionSettings: { type: 'object' }
 }
 
 var windowsTemplateParameters = union(commonTemplateParameters, {
@@ -280,11 +270,9 @@ var commonTemplateParameterValues = {
   sensorUpdatePolicy: { value: '[parameters(\'sensorUpdatePolicy\')]' }
   disableProxy: { value: '[parameters(\'disableProxy\')]' }
   provisioningToken: { value: '[parameters(\'provisioningToken\')]' }
-  proxyHost: { value: '[parameters(\'proxyHost\')]' }
-  proxyPort: { value: '[parameters(\'proxyPort\')]' }
+  proxySettings: { value: '[parameters(\'proxySettings\')]' }
   tags: { value: '[parameters(\'tags\')]' }
-  handlerVersion: { value: '[parameters(\'handlerVersion\')]' }
-  autoUpgradeMinorVersion: { value: '[parameters(\'autoUpgradeMinorVersion\')]' }
+  extensionSettings: { value: '[parameters(\'extensionSettings\')]' }
 }
 
 var windowsTemplateParameterValues = union(commonTemplateParameterValues, {
@@ -307,11 +295,9 @@ var commonLinuxAssignmentParameters = {
   sensorUpdatePolicy: { value: sensorUpdatePolicy }
   disableProxy: { value: disableProxy }
   provisioningToken: { value: provisioningToken }
-  proxyHost: { value: proxyHost }
-  proxyPort: { value: proxyPort }
+  proxySettings: { value: proxySettings }
   tags: { value: tags }
-  handlerVersion: { value: handlerVersion }
-  autoUpgradeMinorVersion: { value: autoUpgradeMinorVersion }
+  extensionSettings: { value: extensionSettings }
 }
 
 var commonWindowsAssignmentParameters = union(commonLinuxAssignmentParameters, {
@@ -380,8 +366,8 @@ resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                     properties: {
                       publisher: 'Crowdstrike.Falcon'
                       type: 'FalconSensorLinux'
-                      typeHandlerVersion: '[parameters(\'handlerVersion\')]'
-                      autoUpgradeMinorVersion: '[parameters(\'autoUpgradeMinorVersion\')]'
+                      typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
+                      autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
                       settings: {
                         azure_vault_name: '[parameters(\'azureVaultName\')]'
                         azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
@@ -389,8 +375,8 @@ resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                         member_cid: '[parameters(\'memberCid\')]'
                         sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
                         disable_proxy: '[parameters(\'disableProxy\')]'
-                        proxy_host: '[parameters(\'proxyHost\')]'
-                        proxy_port: '[parameters(\'proxyPort\')]'
+                        proxy_host: '[parameters(\'proxySettings\').proxyHost]'
+                        proxy_port: '[parameters(\'proxySettings\').proxyPort]'
                         tags: '[parameters(\'tags\')]'
                       }
                       protectedSettings: {
@@ -470,8 +456,8 @@ resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                     properties: {
                       publisher: 'Crowdstrike.Falcon'
                       type: 'FalconSensorLinux'
-                      typeHandlerVersion: '[parameters(\'handlerVersion\')]'
-                      autoUpgradeMinorVersion: '[parameters(\'autoUpgradeMinorVersion\')]'
+                      typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
+                      autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
                       settings: {
                         azure_vault_name: '[parameters(\'azureVaultName\')]'
                         azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
@@ -479,8 +465,8 @@ resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                         member_cid: '[parameters(\'memberCid\')]'
                         sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
                         disable_proxy: '[parameters(\'disableProxy\')]'
-                        proxy_host: '[parameters(\'proxyHost\')]'
-                        proxy_port: '[parameters(\'proxyPort\')]'
+                        proxy_host: '[parameters(\'proxySettings\').proxyHost]'
+                        proxy_port: '[parameters(\'proxySettings\').proxyPort]'
                         tags: '[parameters(\'tags\')]'
                       }
                       protectedSettings: {
@@ -590,8 +576,8 @@ resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                     properties: {
                       publisher: 'Crowdstrike.Falcon'
                       type: 'FalconSensorWindows'
-                      typeHandlerVersion: '[parameters(\'handlerVersion\')]'
-                      autoUpgradeMinorVersion: '[parameters(\'autoUpgradeMinorVersion\')]'
+                      typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
+                      autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
                       settings: {
                         azure_vault_name: '[parameters(\'azureVaultName\')]'
                         azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
@@ -599,8 +585,8 @@ resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                         member_cid: '[parameters(\'memberCid\')]'
                         sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
                         disable_proxy: '[parameters(\'disableProxy\')]'
-                        proxy_host: '[parameters(\'proxyHost\')]'
-                        proxy_port: '[parameters(\'proxyPort\')]'
+                        proxy_host: '[parameters(\'proxySettings\').proxyHost]'
+                        proxy_port: '[parameters(\'proxySettings\').proxyPort]'
                         tags: '[parameters(\'tags\')]'
                         pac_url: '[parameters(\'pacUrl\')]'
                         disable_provisioning_wait: '[parameters(\'disableProvisioningWait\')]'
@@ -685,8 +671,8 @@ resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@
                     properties: {
                       publisher: 'Crowdstrike.Falcon'
                       type: 'FalconSensorWindows'
-                      typeHandlerVersion: '[parameters(\'handlerVersion\')]'
-                      autoUpgradeMinorVersion: '[parameters(\'autoUpgradeMinorVersion\')]'
+                      typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
+                      autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
                       settings: {
                         azure_vault_name: '[parameters(\'azureVaultName\')]'
                         azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
@@ -694,8 +680,8 @@ resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@
                         member_cid: '[parameters(\'memberCid\')]'
                         sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
                         disable_proxy: '[parameters(\'disableProxy\')]'
-                        proxy_host: '[parameters(\'proxyHost\')]'
-                        proxy_port: '[parameters(\'proxyPort\')]'
+                        proxy_host: '[parameters(\'proxySettings\').proxyHost]'
+                        proxy_port: '[parameters(\'proxySettings\').proxyPort]'
                         tags: '[parameters(\'tags\')]'
                         pac_url: '[parameters(\'pacUrl\')]'
                         disable_provisioning_wait: '[parameters(\'disableProvisioningWait\')]'
