@@ -45,7 +45,7 @@ The Azure Policy templates are available as part of the official CrowdStrike Azu
 ### Configuration Options
 - **Falcon Cloud**: Auto-discover, US-1, US-2, EU-1, US-GOV-1
 - **Member CID**: For MSSP scenarios
-- **Sensor Update Policy**: Control sensor update behavior
+- **Sensor Update Policy**: Configure to match your organization's desired sensor update policy instead of using the pre-defined default
 - **Tags**: Sensor grouping and organization
 - **Proxy Settings**: HTTP proxy configuration
 - **Platform-specific settings**: Windows PAC URL, VDI mode; Linux provisioning token
@@ -234,6 +234,9 @@ See https://github.com/CrowdStrike/azure-vm-extension?tab=readme-ov-file#falcon-
 
 ## Parameters Reference
 
+> [!IMPORTANT]
+> As a best practice, make sure to change the `sensorUpdatePolicy` from the default to match your organization's desired sensor update policy as this determins what sensor version will be installed!
+
 ### Common Parameters
 | Parameter | Type | Description | Default |
 |-----------|------|-------------|---------|
@@ -244,7 +247,7 @@ See https://github.com/CrowdStrike/azure-vm-extension?tab=readme-ov-file#falcon-
 | `azureManagedIdentityClientId` | string | Azure Managed Identity Client ID for Key Vault access | '' |
 | `cloud` | string | Falcon Cloud (us-1, us-2, eu-1, us-gov-1) | 'autodiscover' |
 | `memberCid` | string | Member CID for MSSP | '' |
-| `sensorUpdatePolicy` | string | Sensor update policy name | 'platform_default' |
+| `sensorUpdatePolicy` | string | Sensor update policy name. Configure this to match your organization's desired sensor update policy instead of using the pre-defined default. | 'platform_default' |
 | `tags` | string | Comma-separated sensor tags | '' |
 | `policyEffect` | string | Policy effect | 'DeployIfNotExists' |
 | `createRoleAssignments` | bool | Create role assignments for managed identities | true |
