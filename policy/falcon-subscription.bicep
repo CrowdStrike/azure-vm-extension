@@ -345,6 +345,10 @@ resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                 field: 'Microsoft.Compute/virtualMachines/extensions/type'
                 equals: 'FalconSensorLinux'
               }
+              {
+                field: 'Microsoft.Compute/virtualMachines/extensions/provisioningState'
+                equals: 'Succeeded'
+              }
             ]
           }
           roleDefinitionIds: [
@@ -434,6 +438,10 @@ resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
               {
                 field: 'Microsoft.Compute/virtualMachineScaleSets/extensions/type'
                 equals: 'FalconSensorLinux'
+              }
+              {
+                field: 'Microsoft.Compute/virtualMachineScaleSets/extensions/provisioningState'
+                equals: 'Succeeded'
               }
             ]
           }
@@ -555,6 +563,10 @@ resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                 field: 'Microsoft.Compute/virtualMachines/extensions/type'
                 equals: 'FalconSensorWindows'
               }
+              {
+                field: 'Microsoft.Compute/virtualMachines/extensions/provisioningState'
+                equals: 'Succeeded'
+              }
             ]
           }
           roleDefinitionIds: [
@@ -649,6 +661,10 @@ resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@
               {
                 field: 'Microsoft.Compute/virtualMachineScaleSets/extensions/type'
                 equals: 'FalconSensorWindows'
+              }
+              {
+                field: 'Microsoft.Compute/virtualMachineScaleSets/extensions/provisioningState'
+                equals: 'Succeeded'
               }
             ]
           }
