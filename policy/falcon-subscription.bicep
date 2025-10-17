@@ -56,7 +56,7 @@ param vdi bool = false
 
 // Variables
 var operatingSystemLower = toLower(operatingSystem)
-var vmRoleDefinitionId = '8e3af657-a8ff-443c-a75c-2fe8c4bcb635'
+var vmRoleDefinitionId = '9980e02c-c2be-4d73-94e8-173b1dc7cf3c' // Virtual Machine Contributor
 var linuxPolicyDefinitionName = '${policyDefinitionNamePrefix}-Linux'
 var windowsPolicyDefinitionName = '${policyDefinitionNamePrefix}-Windows'
 
