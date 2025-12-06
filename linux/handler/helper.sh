@@ -91,7 +91,9 @@ set_status() {
     local subStatus="${6}"
     local subMessage="${7}"
     local timestamp=$(date --utc --iso-8601=seconds)
-    local statusNum="0"
+
+    # Get sequence number from environment variable, fallback to 0 if not available
+    local statusNum="${ConfigSequenceNumber:-0}"
     local code=0
 
     # Get the status folder path
