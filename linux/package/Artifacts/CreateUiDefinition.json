@@ -111,8 +111,8 @@
             "toolTip": "Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)",
             "constraints": {
               "required": false,
-              "regex": "^[0-9a-fA-F]{32}$",
-              "validationMessage": "Please enter a valid 32-character CID"
+              "regex": "^[0-9a-fA-F]{32}-[0-9a-fA-F]{2}$",
+              "validationMessage": "Please enter a valid MSSP member CID in format: 32 characters followed by hyphen and 2 checksum characters"
             },
             "visible": true
           }
