@@ -13,11 +13,6 @@ jobs:
     permissions:
       contents: write
     steps:
-    - name: Harden the runner (Audit all outbound calls)
-      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
-      with:
-        egress-policy: audit
-
     - name: Checkout repository
       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         
@@ -79,13 +74,9 @@ jobs:
         sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.full_version }}"/g' linux/package/Manifest.json
         sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.full_version }}"/g' windows/package/Manifest.json
         
-        # Update bicep handler versions
-        sed -i 's/param handlerVersion string = '\''[^'\'']*'\''/param handlerVersion string = '\''${{ steps.version.outputs.handler_version }}'\''/g' policy/falcon-subscription.bicep
-        sed -i 's/param handlerVersion string = '\''[^'\'']*'\''/param handlerVersion string = '\''${{ steps.version.outputs.handler_version }}'\''/g' policy/falcon-managementgroup.bicep
-        
-        # Update bicep policy definition default values
-        sed -i 's/defaultValue: '\''0\.0'\''/defaultValue: '\''${{ steps.version.outputs.handler_version }}'\''/g' policy/falcon-subscription.bicep
-        sed -i 's/defaultValue: '\''0\.0'\''/defaultValue: '\''${{ steps.version.outputs.handler_version }}'\''/g' policy/falcon-managementgroup.bicep
+        # Update bicep handler versions (nested inside extensionSettings object)
+        sed -i "s/handlerVersion: '[^']*'/handlerVersion: '${{ steps.version.outputs.handler_version }}'/g" policy/falcon-subscription.bicep
+        sed -i "s/handlerVersion: '[^']*'/handlerVersion: '${{ steps.version.outputs.handler_version }}'/g" policy/falcon-managementgroup.bicep
         
         # Update ARM template handler versions
         sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "${{ steps.version.outputs.handler_version }}"/g' linux/package/Artifacts/MainTemplate.json
