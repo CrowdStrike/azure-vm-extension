@@ -16,6 +16,10 @@ Providing a maintenance token for uninstallation is done by adding `Sensor Updat
 
 For security reasons, the extension does not accept maintenance tokens as direct parameters in its settings. This design choice prevents maintenance tokens from being stored in configuration files or appearing in logs, which could create security vulnerabilities. Instead, the extension obtains the necessary permissions through the OAuth token with the appropriate scope when uninstallation is requested. Alternatively, you can move the hosts to a different sensor update policy that has tamper and uninstall protection disabled.
 
+### The extension failed to install on a VM Scale Set (VMSS). What should I do?
+
+If the CrowdStrike Falcon extension fails to install on a VM Scale Set instance, you must uninstall the extension from the VMSS and then upgrade the VMSS model to ensure the instances are in a consistent state. By upgrading the model after the extension has been uninstalled, the VMSS instance provisioning state will return to succeeded.
+
 ### The installation of the extension is being killed by the operating system's out-of-memory (OOM) killer. What can I do?
 
 This typically happens on VMs with limited memory resources. To resolve this issue, you should increase the VM's memory allocation if possible or use a different VM size with more memory.
