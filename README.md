@@ -245,6 +245,9 @@ For automated enterprise-scale deployment using Azure Policy, see the [Policy Te
 
 ### VM Scale Sets (VMSS)
 
+> [!WARNING]
+> Deploying the CrowdStrike Falcon extension to VMSS instances that serve as AKS node pools is **unsupported**. For AKS workloads, use the [CrowdStrike Falcon DaemonSet](https://github.com/CrowdStrike/falcon-operator) to deploy the sensor as a Kubernetes-native workload instead.
+
 > [!IMPORTANT]
 > When deploying the CrowdStrike Falcon extension to Azure VM Scale Sets, there are important networking considerations to ensure proper sensor installation and operation.
 > Make sure that the VM Scale Sets outbound rules for the load balancer are properly configured to enable connectivity to CrowdStrike APIs for sensor download and installation; otherwise, the sensor installation will fail.
