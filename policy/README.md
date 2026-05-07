@@ -44,6 +44,7 @@ The Azure Policy templates are available as part of the official CrowdStrike Azu
 
 ### Configuration Options
 - **Falcon Cloud**: Auto-discover, US-1, US-2, EU-1, US-GOV-1
+- **Resource Type Selection**: Deploy policies for VMs only, VMSS only, or both
 - **Member CID**: For MSSP scenarios
 - **Sensor Update Policy**: Configure to match your organization's desired sensor update policy instead of using the pre-defined default
 - **Tags**: Sensor grouping and organization
@@ -52,14 +53,14 @@ The Azure Policy templates are available as part of the official CrowdStrike Azu
 
 ## Policy Structure
 
-Each template creates **4 policy definitions** for comprehensive coverage:
+Each template can create up to **4 policy definitions** for comprehensive coverage:
 
 1. **Linux VM Policy** - Deploys Falcon sensor on individual Linux virtual machines
 2. **Linux VMSS Policy** - Deploys Falcon sensor on Linux Virtual Machine Scale Sets
 3. **Windows VM Policy** - Deploys Falcon sensor on individual Windows virtual machines
 4. **Windows VMSS Policy** - Deploys Falcon sensor on Windows Virtual Machine Scale Sets
 
-All policies support the same configuration parameters and authentication methods, ensuring consistent sensor deployment across your entire Azure compute infrastructure.
+Use the `resourceTypes` parameter to deploy only VM policies, only VMSS policies, or both. All policies support the same configuration parameters and authentication methods, ensuring consistent sensor deployment across your selected Azure compute infrastructure.
 
 ## Deployment Options
 
@@ -95,6 +96,24 @@ az deployment sub create \
     operatingSystem="windows" \
     clientId="your-client-id" \
     clientSecret="your-client-secret"
+
+# Deploy VM policies only, skipping VMSS
+az deployment sub create \
+  --location "East US" \
+  --template-file falcon-subscription.bicep \
+  --parameters \
+    resourceTypes="vm" \
+    clientId="your-client-id" \
+    clientSecret="your-client-secret"
+
+# Deploy VMSS policies only
+az deployment sub create \
+  --location "East US" \
+  --template-file falcon-subscription.bicep \
+  --parameters \
+    resourceTypes="vmss" \
+    clientId="your-client-id" \
+    clientSecret="your-client-secret"
 ```
 
 #### PowerShell
@@ -120,6 +139,22 @@ New-AzSubscriptionDeployment `
   -Location "East US" `
   -TemplateFile "falcon-subscription.bicep" `
   -operatingSystem "windows" `
+  -clientId "your-client-id" `
+  -clientSecret "your-client-secret"
+
+# Deploy VM policies only, skipping VMSS
+New-AzSubscriptionDeployment `
+  -Location "East US" `
+  -TemplateFile "falcon-subscription.bicep" `
+  -resourceTypes "vm" `
+  -clientId "your-client-id" `
+  -clientSecret "your-client-secret"
+
+# Deploy VMSS policies only
+New-AzSubscriptionDeployment `
+  -Location "East US" `
+  -TemplateFile "falcon-subscription.bicep" `
+  -resourceTypes "vmss" `
   -clientId "your-client-id" `
   -clientSecret "your-client-secret"
 ```
@@ -172,6 +207,16 @@ az deployment mg create \
     operatingSystem="windows" \
     clientId="your-client-id" \
     clientSecret="your-client-secret"
+
+# Deploy VM policies only at management group level, skipping VMSS
+az deployment mg create \
+  --management-group-id "my-management-group" \
+  --location "East US" \
+  --template-file falcon-managementgroup.bicep \
+  --parameters \
+    resourceTypes="vm" \
+    clientId="your-client-id" \
+    clientSecret="your-client-secret"
 ```
 
 #### PowerShell
@@ -200,6 +245,15 @@ New-AzManagementGroupDeployment `
   -Location "East US" `
   -TemplateFile "falcon-managementgroup.bicep" `
   -operatingSystem "windows" `
+  -clientId "your-client-id" `
+  -clientSecret "your-client-secret"
+
+# Deploy VM policies only at management group level, skipping VMSS
+New-AzManagementGroupDeployment `
+  -ManagementGroupId "my-management-group" `
+  -Location "East US" `
+  -TemplateFile "falcon-managementgroup.bicep" `
+  -resourceTypes "vm" `
   -clientId "your-client-id" `
   -clientSecret "your-client-secret"
 ```
@@ -249,6 +303,8 @@ See https://github.com/CrowdStrike/azure-vm-extension?tab=readme-ov-file#falcon-
 | `memberCid` | string | Member CID for MSSP | '' |
 | `sensorUpdatePolicy` | string | Sensor update policy name. Configure this to match your organization's desired sensor update policy instead of using the pre-defined default. | 'platform_default' |
 | `tags` | string | Comma-separated sensor tags | '' |
+| `operatingSystem` | string | Operating systems to deploy policies for: `linux`, `windows`, or `both` | 'both' |
+| `resourceTypes` | string | Azure compute resource types to deploy policies for: `vm`, `vmss`, or `both` | 'both' |
 | `policyEffect` | string | Policy effect | 'DeployIfNotExists' |
 | `createRoleAssignments` | bool | Create role assignments for managed identities | true |
 | `proxySettings` | object | Network proxy configuration settings | `{proxyHost: '', proxyPort: ''}` |
@@ -308,7 +364,7 @@ The templates create managed identities that need **Virtual Machine Contributor*
 
 ### Manual Role Assignment
 
-When `createRoleAssignments=false`, you must manually assign the VM Contributor role to all 4 policy managed identities:
+When `createRoleAssignments=false`, you must manually assign the VM Contributor role to the policy managed identities created by your selected `operatingSystem` and `resourceTypes` values:
 
 #### Azure CLI
 ```bash
