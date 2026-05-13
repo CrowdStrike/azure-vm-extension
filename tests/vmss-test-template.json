@@ -1,0 +1,598 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "type": "string",
+            "defaultValue": "centraluseuap",
+            "metadata": {
+                "description": "Location for all resources (use EUAP for testing)"
+            }
+        },
+        "vmssName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the VM Scale Set"
+            }
+        },
+        "vmNamePrefix": {
+            "type": "string",
+            "metadata": {
+                "description": "Prefix for VM names in the scale set"
+            }
+        },
+        "vmSize": {
+            "type": "string",
+            "defaultValue": "Standard_D2s_v3",
+            "metadata": {
+                "description": "Size of the virtual machines in the scale set"
+            }
+        },
+        "instanceCount": {
+            "type": "int",
+            "defaultValue": 2,
+            "minValue": 1,
+            "maxValue": 100,
+            "metadata": {
+                "description": "Initial number of VM instances in the scale set"
+            }
+        },
+        "minInstanceCount": {
+            "type": "int",
+            "defaultValue": 1,
+            "minValue": 1,
+            "maxValue": 100,
+            "metadata": {
+                "description": "Minimum number of VM instances"
+            }
+        },
+        "maxInstanceCount": {
+            "type": "int",
+            "defaultValue": 10,
+            "minValue": 1,
+            "maxValue": 1000,
+            "metadata": {
+                "description": "Maximum number of VM instances"
+            }
+        },
+        "adminUsername": {
+            "type": "string",
+            "defaultValue": "azureuser",
+            "metadata": {
+                "description": "Admin username for the VMs"
+            }
+        },
+        "adminPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Password for the Virtual Machines"
+            }
+        },
+        "osType": {
+            "type": "string",
+            "allowedValues": [
+                "Windows",
+                "Linux"
+            ],
+            "metadata": {
+                "description": "Operating System type (Windows or Linux)"
+            }
+        },
+        "imagePublisher": {
+            "type": "string",
+            "defaultValue": "MicrosoftWindowsServer",
+            "metadata": {
+                "description": "Publisher of the VM image (e.g., MicrosoftWindowsServer, Canonical, Debian, RedHat, SUSE)"
+            }
+        },
+        "imageOffer": {
+            "type": "string",
+            "defaultValue": "WindowsServer",
+            "metadata": {
+                "description": "Offer of the VM image (e.g., WindowsServer, 0001-com-ubuntu-server-jammy, debian-12, RHEL)"
+            }
+        },
+        "imageSku": {
+            "type": "string",
+            "defaultValue": "2022-datacenter-g2",
+            "metadata": {
+                "description": "SKU of the VM image (e.g., 2022-datacenter-g2, 22_04-lts-gen2, 12-gen2, 9-lvm-gen2)"
+            }
+        },
+        "imageVersion": {
+            "type": "string",
+            "defaultValue": "latest",
+            "metadata": {
+                "description": "Version of the VM image"
+            }
+        },
+        "architecture": {
+            "type": "string",
+            "defaultValue": "x86_64",
+            "allowedValues": [
+                "x86_64",
+                "arm64"
+            ],
+            "metadata": {
+                "description": "Architecture of the VMs (x86_64 or arm64) - only applies to Linux"
+            }
+        },
+        "upgradePolicy": {
+            "type": "string",
+            "defaultValue": "Manual",
+            "allowedValues": [
+                "Automatic",
+                "Manual",
+                "Rolling"
+            ],
+            "metadata": {
+                "description": "Upgrade policy for the scale set"
+            }
+        },
+        "overprovision": {
+            "type": "bool",
+            "defaultValue": false,
+            "metadata": {
+                "description": "Enable overprovisioning to improve deployment success rate"
+            }
+        },
+        "singlePlacementGroup": {
+            "type": "bool",
+            "defaultValue": true,
+            "metadata": {
+                "description": "Place all VMs in a single placement group (max 100 VMs)"
+            }
+        },
+        "enableLoadBalancer": {
+            "type": "bool",
+            "defaultValue": true,
+            "metadata": {
+                "description": "Create a load balancer for the scale set"
+            }
+        },
+        "falconClientId": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Crowdstrike API Client ID"
+            }
+        },
+        "falconClientSecret": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Crowdstrike API Client Secret"
+            }
+        },
+        "sensorTags": {
+            "type": "string",
+            "defaultValue": "vmssextensiontest",
+            "metadata": {
+                "description": "Comma-separated list of sensor tags for grouping"
+            }
+        },
+        "sensorUpdatePolicy": {
+            "type": "string",
+            "defaultValue": "platform_default",
+            "metadata": {
+                "description": "Sensor update policy setting for Crowdstrike Falcon sensor"
+            }
+        },
+        "useTestExtension": {
+            "type": "bool",
+            "defaultValue": true,
+            "metadata": {
+                "description": "Use test extension instead of production"
+            }
+        },
+        "extensionVersion": {
+            "type": "string",
+            "defaultValue": "1.2",
+            "metadata": {
+                "description": "Extension version to test (use 0.0 for latest test version)"
+            }
+        },
+        "enableRdpAccess": {
+            "type": "bool",
+            "defaultValue": false,
+            "metadata": {
+                "description": "Enable RDP access for Windows VMs (adds security rule for port 3389)"
+            }
+        },
+        "allowedSourceAddressPrefix": {
+            "type": "string",
+            "defaultValue": "*",
+            "metadata": {
+                "description": "Source IP address or CIDR range allowed for RDP access (use specific IP/range for security)"
+            }
+        }
+    },
+    "variables": {
+        "virtualNetworkName": "[concat(parameters('vmssName'), '-vnet')]",
+        "subnetName": "default",
+        "networkSecurityGroupName": "[concat(parameters('vmssName'), '-nsg')]",
+        "loadBalancerName": "[concat(parameters('vmssName'), '-lb')]",
+        "publicIPName": "[concat(parameters('vmssName'), '-pip')]",
+        "storageAccountName": "[concat('bootdiag', uniqueString(resourceGroup().id, parameters('vmssName')))]",
+        "natPoolName": "natpool",
+        "bePoolName": "bepool",
+        "natStartPort": 50000,
+        "natEndPort": 50099,
+        "natBackendPort": "[if(equals(parameters('osType'), 'Windows'), 3389, 22)]",
+        "subnetRef": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('virtualNetworkName'), variables('subnetName'))]",
+        "loadBalancerRef": "[resourceId('Microsoft.Network/loadBalancers', variables('loadBalancerName'))]",
+        "extensionPublisher": "Crowdstrike.Falcon",
+        "isLinux": "[equals(parameters('osType'), 'Linux')]",
+        "isWindows": "[equals(parameters('osType'), 'Windows')]",
+        "extensionName": "[if(variables('isLinux'), if(parameters('useTestExtension'), 'TestFalconSensorLinux', 'FalconSensorLinux'), if(parameters('useTestExtension'), 'TestFalconSensorWindows', 'FalconSensorWindows'))]",
+        "isArm64Image": "[or(contains(parameters('imageSku'), 'arm64'), contains(parameters('imageSku'), 'ARM64'))]",
+        "vmSizeForArch": "[if(and(variables('isLinux'), variables('isArm64Image')), 'Standard_D2pls_v5', parameters('vmSize'))]",
+        "requiresPlan": "[and(equals(parameters('imagePublisher'), 'RedHat'), equals(parameters('imageOffer'), 'rh-rhel'))]",
+        "planPublisher": "[if(variables('requiresPlan'), 'redhat', parameters('imagePublisher'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2023-09-01",
+            "name": "[variables('networkSecurityGroupName')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "AllowRdpInbound",
+                        "properties": {
+                            "description": "Allow RDP access for Windows VMs",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "3389",
+                            "sourceAddressPrefix": "[parameters('allowedSourceAddressPrefix')]",
+                            "destinationAddressPrefix": "*",
+                            "access": "[if(and(parameters('enableRdpAccess'), equals(parameters('osType'), 'Windows')), 'Allow', 'Deny')]",
+                            "priority": 100,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "DenyAllInbound",
+                        "properties": {
+                            "description": "Deny all inbound traffic for security",
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Deny",
+                            "priority": 1000,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "AllowHttpsOutbound",
+                        "properties": {
+                            "description": "Allow HTTPS outbound for CrowdStrike API and web access",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "443",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "Internet",
+                            "access": "Allow",
+                            "priority": 100,
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "AllowHttpOutbound",
+                        "properties": {
+                            "description": "Allow HTTP outbound for package downloads and updates",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "80",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "Internet",
+                            "access": "Allow",
+                            "priority": 110,
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "AllowDnsOutbound",
+                        "properties": {
+                            "description": "Allow DNS queries for name resolution",
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "53",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "Internet",
+                            "access": "Allow",
+                            "priority": 120,
+                            "direction": "Outbound"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2023-09-01",
+            "name": "[variables('virtualNetworkName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+            ],
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "10.0.0.0/16"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('subnetName')]",
+                        "properties": {
+                            "addressPrefix": "10.0.0.0/24",
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "condition": "[parameters('enableLoadBalancer')]",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2023-09-01",
+            "name": "[variables('publicIPName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Static"
+            }
+        },
+        {
+            "condition": "[parameters('enableLoadBalancer')]",
+            "type": "Microsoft.Network/loadBalancers",
+            "apiVersion": "2023-09-01",
+            "name": "[variables('loadBalancerName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "Standard"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPName'))]"
+            ],
+            "properties": {
+                "frontendIPConfigurations": [
+                    {
+                        "name": "LoadBalancerFrontEnd",
+                        "properties": {
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPName'))]"
+                            }
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "[variables('bePoolName')]"
+                    }
+                ],
+                "inboundNatPools": [
+                    {
+                        "name": "[variables('natPoolName')]",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[concat(variables('loadBalancerRef'), '/frontendIPConfigurations/LoadBalancerFrontEnd')]"
+                            },
+                            "protocol": "Tcp",
+                            "frontendPortRangeStart": "[variables('natStartPort')]",
+                            "frontendPortRangeEnd": "[variables('natEndPort')]",
+                            "backendPort": "[variables('natBackendPort')]"
+                        }
+                    }
+                ],
+                "outboundRules": [
+                    {
+                        "name": "myOutboundRule",
+                        "properties": {
+                            "allocatedOutboundPorts": 10000,
+                            "protocol": "All",
+                            "enableTcpReset": false,
+                            "idleTimeoutInMinutes": 15,
+                            "backendAddressPool": {
+                                "id": "[concat(variables('loadBalancerRef'), '/backendAddressPools/', variables('bePoolName'))]"
+                            },
+                            "frontendIPConfigurations": [
+                                {
+                                    "id": "[concat(variables('loadBalancerRef'), '/frontendIPConfigurations/LoadBalancerFrontEnd')]"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2023-01-01",
+            "name": "[variables('storageAccountName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "Standard_LRS"
+            },
+            "kind": "StorageV2",
+            "properties": {
+                "supportsHttpsTrafficOnly": true,
+                "minimumTlsVersion": "TLS1_2",
+                "allowBlobPublicAccess": false
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachineScaleSets",
+            "apiVersion": "2023-09-01",
+            "name": "[parameters('vmssName')]",
+            "location": "[parameters('location')]",
+            "plan": "[if(variables('requiresPlan'), createObject('name', parameters('imageSku'), 'product', parameters('imageOffer'), 'publisher', variables('planPublisher')), null())]",
+            "sku": {
+                "name": "[variables('vmSizeForArch')]",
+                "tier": "Standard",
+                "capacity": "[parameters('instanceCount')]"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
+                "[resourceId('Microsoft.Network/loadBalancers', variables('loadBalancerName'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+            ],
+            "properties": {
+                "overprovision": "[parameters('overprovision')]",
+                "singlePlacementGroup": "[parameters('singlePlacementGroup')]",
+                "upgradePolicy": {
+                    "mode": "[parameters('upgradePolicy')]"
+                },
+                "virtualMachineProfile": {
+                    "storageProfile": {
+                        "imageReference": {
+                            "publisher": "[parameters('imagePublisher')]",
+                            "offer": "[parameters('imageOffer')]",
+                            "sku": "[parameters('imageSku')]",
+                            "version": "[parameters('imageVersion')]"
+                        },
+                        "osDisk": {
+                            "createOption": "FromImage",
+                            "caching": "ReadWrite",
+                            "managedDisk": {
+                                "storageAccountType": "Premium_LRS"
+                            }
+                        }
+                    },
+                    "osProfile": {
+                        "computerNamePrefix": "[parameters('vmNamePrefix')]",
+                        "adminUsername": "[parameters('adminUsername')]",
+                        "adminPassword": "[parameters('adminPassword')]",
+                        "windowsConfiguration": "[if(variables('isWindows'), createObject('enableAutomaticUpdates', true(), 'provisionVMAgent', true()), null())]",
+                        "linuxConfiguration": "[if(variables('isLinux'), createObject('disablePasswordAuthentication', false(), 'provisionVMAgent', true()), null())]"
+                    },
+                    "networkProfile": {
+                        "networkInterfaceConfigurations": [
+                            {
+                                "name": "nic",
+                                "properties": {
+                                    "primary": true,
+                                    "ipConfigurations": [
+                                        {
+                                            "name": "ipconfig",
+                                            "properties": {
+                                                "subnet": {
+                                                    "id": "[variables('subnetRef')]"
+                                                },
+                                                "loadBalancerBackendAddressPools": "[if(parameters('enableLoadBalancer'), createArray(createObject('id', concat(variables('loadBalancerRef'), '/backendAddressPools/', variables('bePoolName')))), createArray())]",
+                                                "loadBalancerInboundNatPools": "[if(parameters('enableLoadBalancer'), createArray(createObject('id', concat(variables('loadBalancerRef'), '/inboundNatPools/', variables('natPoolName')))), createArray())]"
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    },
+                    "extensionProfile": {
+                        "extensions": [
+                            {
+                                "name": "CrowdstrikeFalconSensor",
+                                "properties": {
+                                    "publisher": "[variables('extensionPublisher')]",
+                                    "type": "[variables('extensionName')]",
+                                    "typeHandlerVersion": "[parameters('extensionVersion')]",
+                                    "autoUpgradeMinorVersion": false,
+                                    "protectedSettings": {
+                                        "client_id": "[parameters('falconClientId')]",
+                                        "client_secret": "[parameters('falconClientSecret')]",
+                                        "tags": "[parameters('sensorTags')]",
+                                        "sensor_update_policy": "[parameters('sensorUpdatePolicy')]",
+                                        "disable-provisioning-wait": "true"
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    "diagnosticsProfile": {
+                        "bootDiagnostics": {
+                            "enabled": true,
+                            "storageUri": "[reference(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName')), '2023-01-01').primaryEndpoints.blob]"
+                        }
+                    }
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "vmssName": {
+            "type": "string",
+            "value": "[parameters('vmssName')]"
+        },
+        "location": {
+            "type": "string",
+            "value": "[parameters('location')]"
+        },
+        "osType": {
+            "type": "string",
+            "value": "[parameters('osType')]"
+        },
+        "imageDetails": {
+            "type": "string",
+            "value": "[concat(parameters('imagePublisher'), ':', parameters('imageOffer'), ':', parameters('imageSku'))]"
+        },
+        "architecture": {
+            "type": "string",
+            "value": "[if(variables('isLinux'), parameters('architecture'), 'N/A')]"
+        },
+        "instanceCount": {
+            "type": "int",
+            "value": "[parameters('instanceCount')]"
+        },
+        "minInstanceCount": {
+            "type": "int",
+            "value": "[parameters('minInstanceCount')]"
+        },
+        "maxInstanceCount": {
+            "type": "int",
+            "value": "[parameters('maxInstanceCount')]"
+        },
+        "vmSize": {
+            "type": "string",
+            "value": "[variables('vmSizeForArch')]"
+        },
+        "upgradePolicy": {
+            "type": "string",
+            "value": "[parameters('upgradePolicy')]"
+        },
+        "loadBalancerEnabled": {
+            "type": "bool",
+            "value": "[parameters('enableLoadBalancer')]"
+        },
+        "publicIPAddress": {
+            "type": "string",
+            "value": "[if(parameters('enableLoadBalancer'), reference(resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPName'))).ipAddress, 'N/A')]"
+        },
+        "extensionDeployed": {
+            "type": "string",
+            "value": "[variables('extensionName')]"
+        },
+        "extensionVersion": {
+            "type": "string",
+            "value": "[parameters('extensionVersion')]"
+        },
+        "debugInfo": {
+            "type": "object",
+            "value": {
+                "isLinux": "[variables('isLinux')]",
+                "architecture": "[parameters('architecture')]",
+                "osType": "[parameters('osType')]",
+                "vmSizeForArch": "[variables('vmSizeForArch')]",
+                "extensionName": "[variables('extensionName')]",
+                "natBackendPort": "[variables('natBackendPort')]",
+                "singlePlacementGroup": "[parameters('singlePlacementGroup')]",
+                "overprovision": "[parameters('overprovision')]"
+            }
+        }
+    }
+}
