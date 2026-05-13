@@ -423,6 +423,10 @@ resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
             field: 'Microsoft.Compute/virtualMachineScaleSets/virtualMachineProfile.osProfile.linuxConfiguration'
             exists: 'true'
           }
+          {
+            field: 'tags[\'aks-managed-poolName\']'
+            exists: 'false'
+          }
         ]
       }
       then: {
@@ -645,6 +649,10 @@ resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@
           {
             field: 'Microsoft.Compute/virtualMachineScaleSets/virtualMachineProfile.osProfile.windowsConfiguration'
             exists: 'true'
+          }
+          {
+            field: 'tags[\'aks-managed-poolName\']'
+            exists: 'false'
           }
         ]
       }
