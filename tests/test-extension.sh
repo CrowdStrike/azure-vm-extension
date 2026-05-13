@@ -11,6 +11,8 @@ LOCATION="centraluseuap"
 TEMPLATE_FILE="./vm-test-template.json"
 PARAMETERS_FILE="./vm-test-parameters.json"
 CONFIG_FILE="./test.config"
+VMSS_TEMPLATE_FILE="./vmss-test-template.json"
+VMSS_PARAMETERS_FILE="./vmss-test-parameters.json"
 
 # Extension settings
 FALCON_CLIENT_ID="${FALCON_CLIENT_ID:-}"
@@ -25,7 +27,7 @@ SENSOR_UPDATE_POLICY="${SENSOR_UPDATE_POLICY:-platform_default}"
 OS_TYPE="both"
 CLEANUP_AFTER_TEST="true"
 WAIT_TIMEOUT=1200
-MAX_ATTEMPTS=30
+DEPLOYMENT_TYPE="both"
 AZURE_DEBUG="false"
 
 # Colors for output
@@ -95,6 +97,12 @@ validate_param() {
                 return 1
             fi
             ;;
+        "min_60")
+            if ! [[ "$param_value" =~ ^[0-9]+$ ]] || [[ "$param_value" -lt 60 ]]; then
+                log ERROR "$param_name must be an integer >= 60"
+                return 1
+            fi
+            ;;
         "file")
             if [[ ! -f "$param_value" ]]; then
                 log ERROR "$param_name file not found: $param_value"
@@ -118,14 +126,17 @@ parse_arguments() {
                 fi
                 shift 2
                 ;;
-            --timeout)
-                WAIT_TIMEOUT="$2"
-                validate_param "timeout" "$WAIT_TIMEOUT" "positive_int" || exit 1
+            --deployment-type)
+                DEPLOYMENT_TYPE="$2"
+                if [[ ! "$DEPLOYMENT_TYPE" =~ ^(vm|vmss|both)$ ]]; then
+                    log ERROR "Invalid deployment type: $DEPLOYMENT_TYPE. Must be 'vm', 'vmss', or 'both'"
+                    exit 1
+                fi
                 shift 2
                 ;;
-            --max-attempts)
-                MAX_ATTEMPTS="$2"
-                validate_param "max-attempts" "$MAX_ATTEMPTS" "positive_int" || exit 1
+            --timeout)
+                WAIT_TIMEOUT="$2"
+                validate_param "timeout" "$WAIT_TIMEOUT" "min_60" || exit 1
                 shift 2
                 ;;
             --location)
@@ -293,10 +304,17 @@ check_prerequisites() {
         validate_param "WINDOWS_ADMIN_PASSWORD" "$WINDOWS_ADMIN_PASSWORD" || exit 1
     fi
 
-    # Check required files
-    validate_param "Template file" "$TEMPLATE_FILE" "file" || exit 1
-    validate_param "Parameters file" "$PARAMETERS_FILE" "file" || exit 1
-    validate_param "Config file" "$CONFIG_FILE" "file" || exit 1
+    # Check required files based on deployment type
+    if [[ "$DEPLOYMENT_TYPE" == "vm" || "$DEPLOYMENT_TYPE" == "both" ]]; then
+        validate_param "Template file" "$TEMPLATE_FILE" "file" || exit 1
+        validate_param "Parameters file" "$PARAMETERS_FILE" "file" || exit 1
+        validate_param "Config file" "$CONFIG_FILE" "file" || exit 1
+    fi
+
+    if [[ "$DEPLOYMENT_TYPE" == "vmss" || "$DEPLOYMENT_TYPE" == "both" ]]; then
+        validate_param "VMSS Template file" "$VMSS_TEMPLATE_FILE" "file" || exit 1
+        validate_param "VMSS Parameters file" "$VMSS_PARAMETERS_FILE" "file" || exit 1
+    fi
 
     log SUCCESS "Prerequisites check passed"
 }
@@ -363,11 +381,12 @@ install_extension_direct() {
 check_extension_status() {
     local resource_group=$1
     local vm_name=$2
+    local deadline=$(( $(date +%s) + WAIT_TIMEOUT ))
     local attempt=1
 
-    log INFO "Checking extension status for VM: $vm_name"
+    log INFO "Checking extension status for VM: $vm_name (timeout: ${WAIT_TIMEOUT}s)"
 
-    while [[ $attempt -le $MAX_ATTEMPTS ]]; do
+    while [[ $(date +%s) -lt $deadline ]]; do
         local status=$(run_az_command vm extension show \
             --resource-group "$resource_group" \
             --vm-name "$vm_name" \
@@ -385,17 +404,17 @@ check_extension_status() {
                 return 1
                 ;;
             "Creating"|"Updating")
-                log INFO "Extension installation in progress (attempt $attempt/$MAX_ATTEMPTS)..."
+                log INFO "Extension installation in progress (attempt $attempt)..."
                 sleep 30
                 ((attempt++))
                 ;;
             "NotFound")
-                log WARNING "Extension not found (attempt $attempt/$MAX_ATTEMPTS)..."
+                log WARNING "Extension not found (attempt $attempt)..."
                 sleep 30
                 ((attempt++))
                 ;;
             *)
-                log WARNING "Unknown extension status: $status (attempt $attempt/$MAX_ATTEMPTS)..."
+                log WARNING "Unknown extension status: $status (attempt $attempt)..."
                 sleep 30
                 ((attempt++))
                 ;;
@@ -403,6 +422,132 @@ check_extension_status() {
     done
 
     log ERROR "Extension status check timed out"
+    return 1
+}
+
+# Generate VMSS parameters file from template
+generate_vmss_parameters_file() {
+    local vmss_name=$1
+    local os_type=$2
+    local publisher=$3
+    local offer=$4
+    local sku=$5
+    local admin_password=$6
+    local temp_params=$7
+
+    cp "$VMSS_PARAMETERS_FILE" "$temp_params"
+
+    local os_tag=$(echo "$os_type" | tr '[:upper:]' '[:lower:]')
+
+    sed_inplace "s/$(escape_for_sed "REPLACE_WITH_SECURE_PASSWORD")/$(escape_for_sed "$admin_password")/g" "$temp_params"
+    sed_inplace "s/$(escape_for_sed "REPLACE_WITH_CLIENT_ID")/$(escape_for_sed "$FALCON_CLIENT_ID")/g" "$temp_params"
+    sed_inplace "s/$(escape_for_sed "REPLACE_WITH_CLIENT_SECRET")/$(escape_for_sed "$FALCON_CLIENT_SECRET")/g" "$temp_params"
+    sed_inplace "s/$(escape_for_sed "REPLACE_WITH_SENSOR_UPDATE_POLICY")/$(escape_for_sed "$SENSOR_UPDATE_POLICY")/g" "$temp_params"
+    sed_inplace "s/$(escape_for_sed "CSTestVMSS")/$(escape_for_sed "$vmss_name")/g" "$temp_params"
+    sed_inplace "s/$(escape_for_sed "\"centraluseuap\"")/$(escape_for_sed "\"$LOCATION\"")/g" "$temp_params"
+    sed_inplace "s/$(escape_for_sed "\"Linux\"")/$(escape_for_sed "\"$os_type\"")/g" "$temp_params"
+    sed_inplace "s/$(escape_for_sed "\"Canonical\"")/$(escape_for_sed "\"$publisher\"")/g" "$temp_params"
+    sed_inplace "s/$(escape_for_sed "\"0001-com-ubuntu-server-jammy\"")/$(escape_for_sed "\"$offer\"")/g" "$temp_params"
+    sed_inplace "s/$(escape_for_sed "\"22_04-lts-gen2\"")/$(escape_for_sed "\"$sku\"")/g" "$temp_params"
+    sed_inplace "s/$(escape_for_sed "vmssextensiontest,linux")/$(escape_for_sed "vmssextensiontest,$os_tag")/g" "$temp_params"
+}
+
+# Check VMSS extension status via VMSS provisioning state then instance-level
+check_vmss_extension_status() {
+    local resource_group=$1
+    local vmss_name=$2
+    local deadline=$(( $(date +%s) + WAIT_TIMEOUT ))
+    local attempt=1
+
+    log INFO "Checking VMSS status for: $vmss_name (timeout: ${WAIT_TIMEOUT}s)"
+
+    # Wait for the VMSS itself to finish provisioning
+    while [[ $(date +%s) -lt $deadline ]]; do
+        local status=$(run_az_command vmss show \
+            --resource-group "$resource_group" \
+            --name "$vmss_name" \
+            --query "provisioningState" \
+            --output tsv 2>/dev/null || echo "NotFound")
+
+        case $status in
+            "Succeeded")
+                log SUCCESS "VMSS provisioning succeeded"
+                check_vmss_instance_extensions "$resource_group" "$vmss_name"
+                return $?
+                ;;
+            "Failed")
+                log ERROR "VMSS provisioning failed"
+                return 1
+                ;;
+            "Creating"|"Updating"|"NotFound")
+                log INFO "VMSS provisioning in progress (attempt $attempt)..."
+                sleep 30
+                ((attempt++))
+                ;;
+            *)
+                log WARNING "Unknown VMSS status: $status (attempt $attempt)..."
+                sleep 30
+                ((attempt++))
+                ;;
+        esac
+    done
+
+    log ERROR "VMSS status check timed out"
+    return 1
+}
+
+# Check extension status on individual VMSS instances
+check_vmss_instance_extensions() {
+    local resource_group=$1
+    local vmss_name=$2
+    local deadline=$(( $(date +%s) + WAIT_TIMEOUT ))
+
+    log INFO "Checking VMSS instance-level extension status..."
+
+    while [[ $(date +%s) -lt $deadline ]]; do
+        local ext_codes
+        ext_codes=$(run_az_command vmss get-instance-view \
+            --resource-group "$resource_group" \
+            --name "$vmss_name" \
+            --instance-id "*" \
+            --query "[].extensions[?name=='$EXTENSION_NAME'][].statuses[0].code" \
+            --output tsv 2>/dev/null) || true
+
+        if [[ -z "$ext_codes" ]]; then
+            log WARNING "No extension status available yet, waiting..."
+            sleep 30
+            continue
+        fi
+
+        local instance_count=0
+        local success_count=0
+        local any_failed="false"
+
+        while IFS= read -r code; do
+            [[ -z "$code" ]] && continue
+            instance_count=$((instance_count + 1))
+            if [[ "$code" == *"/succeeded"* ]]; then
+                success_count=$((success_count + 1))
+            elif [[ "$code" == *"/failed"* ]]; then
+                log ERROR "Instance extension status: $code"
+                any_failed="true"
+            fi
+        done <<< "$ext_codes"
+
+        if [[ "$any_failed" == "true" ]]; then
+            return 1
+        fi
+
+        if [[ $instance_count -gt 0 && $success_count -eq $instance_count ]]; then
+            log SUCCESS "All $instance_count VMSS instances report extension success"
+            return 0
+        fi
+
+        log INFO "Waiting for all instances to complete extension installation ($success_count/$instance_count ready)..."
+        sleep 30
+    done
+
+    log ERROR "VMSS instance extension check timed out"
     return 1
 }
 
@@ -432,6 +577,20 @@ generate_vm_name() {
     echo "$vm_name"
 }
 
+# Cross-platform sed compatibility function
+sed_inplace() {
+    if [[ "$(uname)" == "Darwin" ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
+# Escape special characters for sed (bash 3.2 compatible)
+escape_for_sed() {
+    printf '%s\n' "$1" | sed 's/[[\.*^$()+?{|]/\\&/g'
+}
+
 # Generate parameters file from template
 generate_parameters_file() {
     local vm_name=$1
@@ -446,21 +605,9 @@ generate_parameters_file() {
     # Start with original parameters file
     cp "$PARAMETERS_FILE" "$temp_params"
 
-    # Cross-platform sed compatibility function
-    sed_inplace() {
-        if [[ "$(uname)" == "Darwin" ]]; then
-            sed -i '' "$@"
-        else
-            sed -i "$@"
-        fi
-    }
-
-    # Escape special characters for sed (bash 3.2 compatible)
-    escape_for_sed() {
-        printf '%s\n' "$1" | sed 's/[[\.*^$()+?{|]/\\&/g'
-    }
-
     # Apply parameter replacements individually (bash 3.2 compatible)
+    local computer_name=$(echo "$vm_name" | tr '[:upper:]' '[:lower:]' | head -c 15)
+    sed_inplace "s/$(escape_for_sed "\"cstestvm\"")/$(escape_for_sed "\"$computer_name\"")/g" "$temp_params"
     sed_inplace "s/$(escape_for_sed "REPLACE_WITH_SECURE_PASSWORD")/$(escape_for_sed "$admin_password")/g" "$temp_params"
     sed_inplace "s/$(escape_for_sed "REPLACE_WITH_CLIENT_ID")/$(escape_for_sed "$FALCON_CLIENT_ID")/g" "$temp_params"
     sed_inplace "s/$(escape_for_sed "REPLACE_WITH_CLIENT_SECRET")/$(escape_for_sed "$FALCON_CLIENT_SECRET")/g" "$temp_params"
@@ -552,6 +699,142 @@ test_os_configuration() {
     deploy_and_test_configuration "$config" "$resource_group" "$vm_name"
 }
 
+# VMSS test configurations (hardcoded — one Linux, one Windows x86_64)
+get_vmss_test_configs() {
+    local filter_os_type="$1"
+    local configs=()
+
+    if [[ "$filter_os_type" == "linux" || "$filter_os_type" == "both" ]]; then
+        configs+=("Linux:Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2")
+    fi
+    if [[ "$filter_os_type" == "windows" || "$filter_os_type" == "both" ]]; then
+        configs+=("Windows:MicrosoftWindowsServer:WindowsServer:2022-datacenter-g2")
+    fi
+
+    printf '%s\n' "${configs[@]}"
+}
+
+# Generate unique VMSS name
+generate_vmss_name() {
+    local os_type=$1
+    local sku=$2
+    local timestamp=$(date +%H%M%S)
+
+    local os_tag=$(echo "$os_type" | tr '[:upper:]' '[:lower:]')
+    local sku_clean=$(echo "$sku" | sed 's/[^a-zA-Z0-9]/-/g')
+    local vmss_name="cstest-vmss-${os_tag}-${sku_clean}-${timestamp}"
+
+    if [[ ${#vmss_name} -gt 64 ]]; then
+        vmss_name=$(echo "$vmss_name" | head -c 64)
+    fi
+
+    echo "$vmss_name"
+}
+
+# Run VMSS tests
+run_vmss_tests() {
+    local vmss_configs=()
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && vmss_configs+=("$line")
+    done < <(get_vmss_test_configs "$OS_TYPE")
+
+    if [[ ${#vmss_configs[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    local total_tests=${#vmss_configs[@]}
+    local passed_tests=0
+    local failed_tests=0
+    local start_time=$(date +%s)
+
+    local timestamp=$(date +%Y%m%d-%H%M%S)
+    local resource_group="CS-VMSS-Test-${timestamp}"
+
+    log INFO "Creating VMSS resource group: $resource_group"
+    if ! run_az_command group create --name "$resource_group" --location "$LOCATION" --output none; then
+        log ERROR "Failed to create VMSS resource group: $resource_group"
+        return 1
+    fi
+
+    log INFO "Starting VMSS Extension Testing"
+    log INFO "OS Type: $OS_TYPE, Total VMSS tests: $total_tests, Location: $LOCATION"
+    log INFO "Resource Group: $resource_group, Cleanup: $CLEANUP_AFTER_TEST"
+    echo ""
+
+    for config in "${vmss_configs[@]}"; do
+        echo "═══════════════════════════════════════════════════"
+        local os_type=$(echo "$config" | cut -d':' -f1)
+        local publisher=$(echo "$config" | cut -d':' -f2)
+        local offer=$(echo "$config" | cut -d':' -f3)
+        local sku=$(echo "$config" | cut -d':' -f4)
+        local admin_password=$(get_os_config "$os_type" "admin_password")
+
+        local vmss_name=$(generate_vmss_name "$os_type" "$sku")
+        local deployment_name="vmss-deployment-${vmss_name}"
+        local temp_params="/tmp/vmss-params-${vmss_name}.json"
+        local display="VMSS $os_type: $publisher $offer $sku (x86_64)"
+
+        log INFO "Testing $display"
+        log INFO "VMSS Name: $vmss_name"
+
+        generate_vmss_parameters_file "$vmss_name" "$os_type" "$publisher" "$offer" "$sku" "$admin_password" "$temp_params"
+
+        log INFO "Deploying VMSS template..."
+        if run_az_command deployment group create \
+            --name "$deployment_name" \
+            --resource-group "$resource_group" \
+            --template-file "$VMSS_TEMPLATE_FILE" \
+            --parameters "@$temp_params" \
+            --output none; then
+
+            log SUCCESS "VMSS deployment completed"
+            rm -f "$temp_params"
+
+            if check_vmss_extension_status "$resource_group" "$vmss_name"; then
+                log SUCCESS "✅ $display: Extension test PASSED"
+                ((passed_tests++))
+            else
+                log ERROR "❌ $display: Extension test FAILED"
+                ((failed_tests++))
+            fi
+        else
+            log ERROR "❌ $display: Deployment FAILED"
+            rm -f "$temp_params"
+            ((failed_tests++))
+        fi
+        echo ""
+    done
+
+    # Summary
+    local end_time=$(date +%s)
+    local total_duration=$((end_time - start_time))
+    local total_minutes=$((total_duration / 60))
+    local remaining_seconds=$((total_duration % 60))
+
+    echo "═══════════════════════════════════════════════════"
+    log INFO "VMSS TEST SUMMARY"
+    echo "Total tests: $total_tests, Passed: $passed_tests, Failed: $failed_tests"
+    echo "Duration: ${total_minutes}m ${remaining_seconds}s"
+    echo ""
+
+    # Cleanup
+    if [[ "$CLEANUP_AFTER_TEST" == "true" ]]; then
+        log INFO "Cleaning up VMSS resource group: $resource_group"
+        run_az_command group delete --name "$resource_group" --force-deletion-types Microsoft.Compute/virtualMachineScaleSets --yes --no-wait --output none
+        log SUCCESS "VMSS resource group cleanup initiated"
+    else
+        log WARNING "Keeping VMSS resource group: $resource_group (cleanup disabled)"
+    fi
+
+    if [[ $failed_tests -eq 0 ]]; then
+        log SUCCESS "🎉 All VMSS tests passed!"
+        return 0
+    else
+        log ERROR "💥 $failed_tests VMSS test(s) failed"
+        return 1
+    fi
+}
+
 # Main testing function
 run_tests() {
     local os_configs=()
@@ -610,7 +893,8 @@ run_tests() {
     echo "═══════════════════════════════════════════════════"
     log INFO "TEST SUMMARY"
     echo "Total tests: $total_tests, Passed: $passed_tests, Failed: $failed_tests"
-    echo "Duration: ${total_minutes}m ${total_duration}s"
+    local remaining_seconds=$((total_duration % 60))
+    echo "Duration: ${total_minutes}m ${remaining_seconds}s"
     echo ""
 
     # Cleanup
@@ -641,16 +925,16 @@ Test Crowdstrike Falcon Extension across multiple operating systems
 BASIC OPTIONS:
   --os TYPE                 Operating system to test: linux, windows, or both
                             (default: both)
+  --deployment-type TYPE    Deployment type to test: vm, vmss, or both
+                            (default: both)
   --location LOCATION       Azure region for deployment
                             (default: centraluseuap)
   --disable-cleanup         Disable cleanup of resources after test
   -h, --help                Show this help message
 
 TIMING OPTIONS:
-  --timeout SECONDS         Timeout for deployment operations in seconds
-                            (default: 1200)
-  --max-attempts NUMBER     Maximum attempts for extension status checks
-                            (default: 30)
+  --timeout SECONDS         Timeout for extension status checks in seconds
+                            (default: 1200, minimum: 60)
 
 FILE OPTIONS:
   --template-file PATH      Path to ARM template file
@@ -675,7 +959,7 @@ REQUIRED ENVIRONMENT VARIABLES:
   WINDOWS_ADMIN_PASSWORD    Windows VM admin password (for Windows tests)
 
 EXAMPLES:
-  # Test both Linux and Windows
+  # Test both VM and VMSS for all operating systems (default)
   $0
 
   # Test only Linux distributions
@@ -684,6 +968,15 @@ EXAMPLES:
   # Test only Windows versions
   $0 --os windows
 
+  # Test only VMs (skip VMSS)
+  $0 --deployment-type vm
+
+  # Test only VMSS
+  $0 --deployment-type vmss
+
+  # Test VMSS for Linux only
+  $0 --deployment-type vmss --os linux
+
   # Test with cleanup disabled and custom timeout
   $0 --disable-cleanup --timeout 1800
 
@@ -691,7 +984,7 @@ EXAMPLES:
   $0 --os linux --location eastus2
 
   # Test with custom config file
-  $0 --config-file ./custom-test.config
+  $0 --config ./custom-test.config
 EOF
 }
 
@@ -700,7 +993,18 @@ main() {
     parse_arguments "$@"
     check_prerequisites
     set_subscription
-    run_tests
+
+    local exit_code=0
+
+    if [[ "$DEPLOYMENT_TYPE" == "vm" || "$DEPLOYMENT_TYPE" == "both" ]]; then
+        run_tests || exit_code=1
+    fi
+
+    if [[ "$DEPLOYMENT_TYPE" == "vmss" || "$DEPLOYMENT_TYPE" == "both" ]]; then
+        run_vmss_tests || exit_code=1
+    fi
+
+    exit $exit_code
 }
 
 main "$@"

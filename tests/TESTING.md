@@ -1,11 +1,12 @@
 # Crowdstrike VM Extension Testing
 
-This directory contains testing tools for the Crowdstrike Falcon VM Extension that supports both Linux and Windows operating systems.
+This directory contains testing tools for the Crowdstrike Falcon VM Extension that supports both Linux and Windows operating systems on VMs and VM Scale Sets (VMSS).
 
 ## Overview
 
 The testing framework allows you to:
 - Deploy VMs with the Crowdstrike Falcon extension across multiple operating systems
+- Deploy VMSS with the Crowdstrike Falcon extension (one Linux, one Windows x86_64)
 - Test Linux distributions (Ubuntu, Debian, RHEL, SLES) with x86_64 and arm64 architectures
 - Test Windows Server versions (2019, 2022, Core editions, Azure editions)
 - Run tests for specific platforms or all platforms
@@ -16,8 +17,10 @@ The testing framework allows you to:
 
 - **`test-extension.sh`** - Main testing script for both Linux and Windows
 - **`vm-test-template.json`** - ARM template for VM creation and extension deployment
-- **`vm-test-parameters.json`** - Parameters template file
-- **`test.config`** - OS configurations for both platforms (key=value format)
+- **`vm-test-parameters.json`** - VM parameters template file
+- **`vmss-test-template.json`** - ARM template for VMSS creation and extension deployment
+- **`vmss-test-parameters.json`** - VMSS parameters template file
+- **`test.config`** - OS configurations for VM tests (key=value format)
 
 ## Prerequisites
 
@@ -53,7 +56,7 @@ export WINDOWS_ADMIN_PASSWORD='SecureWindowsPass123!'
 ### Basic Commands
 
 ```bash
-# Test both Linux and Windows (default)
+# Test both VM and VMSS for all operating systems (default)
 ./test-extension.sh
 
 # Test only Linux distributions
@@ -61,6 +64,15 @@ export WINDOWS_ADMIN_PASSWORD='SecureWindowsPass123!'
 
 # Test only Windows versions
 ./test-extension.sh --os windows
+
+# Test only VMs (skip VMSS)
+./test-extension.sh --deployment-type vm
+
+# Test only VMSS
+./test-extension.sh --deployment-type vmss
+
+# Test VMSS for Linux only
+./test-extension.sh --deployment-type vmss --os linux
 
 # Keep resources for debugging
 ./test-extension.sh --disable-cleanup
@@ -72,14 +84,11 @@ export WINDOWS_ADMIN_PASSWORD='SecureWindowsPass123!'
 # Custom timeout (seconds)
 ./test-extension.sh --timeout 1800
 
-# Custom max attempts for status checks
-./test-extension.sh --max-attempts 20
-
 # Different Azure region
 ./test-extension.sh --location eastus2
 
 # Custom config file
-./test-extension.sh --config-file custom-test.config
+./test-extension.sh --config custom-test.config
 
 # Combine options
 ./test-extension.sh --os linux --location westus2 --disable-cleanup
@@ -90,13 +99,13 @@ export WINDOWS_ADMIN_PASSWORD='SecureWindowsPass123!'
 | Option | Values | Default | Description |
 |--------|--------|---------|-------------|
 | `--os` | `linux`, `windows`, `both` | `both` | Operating system(s) to test |
-| `--timeout` | seconds (≥60) | `1200` | Timeout for deployment operations |
-| `--max-attempts` | number (≥1) | `30` | Maximum attempts for extension status checks |
+| `--deployment-type` | `vm`, `vmss`, `both` | `both` | Deployment type(s) to test |
+| `--timeout` | seconds (≥60) | `1200` | Timeout for extension status checks |
 | `--location` | region | `centraluseuap` | Azure region for deployment |
 | `--template-file` | path | `vm-test-template.json` | Path to ARM template file |
 | `--parameters-file` | path | `vm-test-parameters.json` | Path to parameters file |
 | `--subscription-id` | uuid | `$AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
-| `--config-file` | path | `./test.config` | Path to test configuration file |
+| `--config` | path | `./test.config` | Path to test configuration file |
 | `--disable-cleanup` | - | false | Disable cleanup of resources after tests |
 | `-h`, `--help` | - | - | Show help message |
 
@@ -134,12 +143,25 @@ version=latest
 
 ## Test Process
 
-For each OS configuration, the script:
+### VM Tests
+
+For each OS configuration in `test.config`, the script:
 
 1. **Creates** a dedicated resource group
 2. **Deploys** the ARM template with OS-specific parameters
 3. **Waits** for VM and extension deployment completion
 4. **Verifies** extension installation status
+5. **Reports** success or failure
+6. **Cleans up** resources (unless disabled)
+
+### VMSS Tests
+
+The script runs two fixed VMSS deployments (one Linux, one Windows x86_64):
+
+1. **Creates** a dedicated resource group for VMSS tests
+2. **Deploys** the VMSS ARM template with OS-specific parameters
+3. **Waits** for VMSS extension provisioning at the model level
+4. **Verifies** extension installation on individual instances
 5. **Reports** success or failure
 6. **Cleans up** resources (unless disabled)
 
@@ -285,15 +307,17 @@ The testing setup includes:
 
 ```
 tests/
-├── test-extension.sh              # Main test script
-├── vm-test-template.json          # ARM template
-├── vm-test-parameters.json        # Parameters
-├── test.config                    # OS configurations
+├── test-extension.sh              # Main test script (VM + VMSS)
+├── vm-test-template.json          # VM ARM template
+├── vm-test-parameters.json        # VM parameters
+├── vmss-test-template.json        # VMSS ARM template
+├── vmss-test-parameters.json      # VMSS parameters
+├── test.config                    # VM OS configurations
 └── TESTING.md                     # This documentation
 ```
 
 The script follows this flow:
 1. Parse command line options
-2. Read and filter OS configurations
-3. For each configuration: create resources → deploy → verify → cleanup
+2. **VM tests**: Read and filter OS configurations from `test.config`, deploy each as a single VM
+3. **VMSS tests**: Deploy one Linux and one Windows x86_64 VMSS using fixed configurations
 4. Generate unified test summary

@@ -275,7 +275,7 @@
                 "publisher": "[variables('extensionPublisher')]",
                 "type": "[variables('extensionName')]",
                 "typeHandlerVersion": "[parameters('extensionVersion')]",
-                "autoUpgradeMinorVersion": true,
+                "autoUpgradeMinorVersion": false,
                 "protectedSettings": {
                     "client_id": "[parameters('falconClientId')]",
                     "client_secret": "[parameters('falconClientSecret')]",
