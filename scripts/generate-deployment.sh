@@ -206,7 +206,7 @@ generate_deployment() {
             type_name="TestFalconSensorLinux"
             label="Test Extension for the CrowdStrike Falcon Sensor for Linux"
             description="CrowdStrike Falcon Sensor for Linux Test Extension"
-            media_link="https://vmextensiontest.blob.core.windows.net/extensions/testlinuxextension-${VERSION}.zip"
+            media_link="https://vmextensiontest.blob.core.windows.net/extensions/csfalcon-linux-handler-test-${VERSION}.zip"
         else
             type_name="FalconSensorLinux"
             label="CrowdStrike Falcon Sensor for Linux VM Extension"
@@ -219,7 +219,7 @@ generate_deployment() {
             type_name="TestFalconSensorWindows"
             label="Test Extension for the CrowdStrike Falcon Sensor for Windows"
             description="CrowdStrike Falcon Sensor for Windows Test Extension"
-            media_link="https://vmextensiontest.blob.core.windows.net/extensions/testwindowsextension-${VERSION}.zip"
+            media_link="https://vmextensiontest.blob.core.windows.net/extensions/csfalcon-windows-handler-test-${VERSION}.zip"
         else
             type_name="FalconSensorWindows"
             label="CrowdStrike Falcon Sensor for Windows VM Extension"
