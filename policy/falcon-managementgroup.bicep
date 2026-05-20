@@ -8,6 +8,14 @@ targetScope = 'managementGroup'
 ])
 param operatingSystem string = 'both'
 
+@description('Azure compute resource types to deploy policies for')
+@allowed([
+  'vm'
+  'vmss'
+  'both'
+])
+param resourceTypes string = 'both'
+
 @description('Policy definition name prefix')
 param policyDefinitionNamePrefix string = 'CS-Falcon-Policy'
 
@@ -56,6 +64,11 @@ param vdi bool = false
 
 // Variables
 var operatingSystemLower = toLower(operatingSystem)
+var resourceTypesLower = toLower(resourceTypes)
+var deployLinuxPolicies = operatingSystemLower == 'linux' || operatingSystemLower == 'both'
+var deployWindowsPolicies = operatingSystemLower == 'windows' || operatingSystemLower == 'both'
+var deployVmPolicies = resourceTypesLower == 'vm' || resourceTypesLower == 'both'
+var deployVmssPolicies = resourceTypesLower == 'vmss' || resourceTypesLower == 'both'
 var vmRoleDefinitionId = '9980e02c-c2be-4d73-94e8-173b1dc7cf3c' // Virtual Machine Contributor
 var linuxPolicyDefinitionName = '${policyDefinitionNamePrefix}-Linux'
 var windowsPolicyDefinitionName = '${policyDefinitionNamePrefix}-Windows'
@@ -309,7 +322,7 @@ var commonWindowsAssignmentParameters = union(commonLinuxAssignmentParameters, {
 })
 
 // Create Linux VM policy definition
-resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (operatingSystemLower == 'linux' || operatingSystemLower == 'both') {
+resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (deployLinuxPolicies && deployVmPolicies) {
   name: '${linuxPolicyDefinitionName}-VM'
   properties: {
     displayName: 'Deploy CrowdStrike Falcon sensor on Linux VMs'
@@ -403,7 +416,7 @@ resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
 }
 
 // Create Linux VMSS policy definition
-resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (operatingSystemLower == 'linux' || operatingSystemLower == 'both') {
+resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (deployLinuxPolicies && deployVmssPolicies) {
   name: '${linuxPolicyDefinitionName}-VMSS'
   properties: {
     displayName: 'Deploy CrowdStrike Falcon sensor on Linux VMSS'
@@ -497,7 +510,7 @@ resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
 }
 
 // Create Linux VM policy assignment at management group level
-resource linuxVmPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'linux' || operatingSystemLower == 'both') {
+resource linuxVmPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (deployLinuxPolicies && deployVmPolicies) {
   name: 'CS-Falcon-Linux-VM-MG'
   location: deployment().location
   identity: {
@@ -512,7 +525,7 @@ resource linuxVmPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020
 }
 
 // Create Linux VMSS policy assignment at management group level
-resource linuxVmssPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'linux' || operatingSystemLower == 'both') {
+resource linuxVmssPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (deployLinuxPolicies && deployVmssPolicies) {
   name: 'CS-Falcon-Linux-VMSS-MG'
   location: deployment().location
   identity: {
@@ -527,7 +540,7 @@ resource linuxVmssPolicyAssignment 'Microsoft.Authorization/policyAssignments@20
 }
 
 // Create Windows VM policy definition
-resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (operatingSystemLower == 'windows' || operatingSystemLower == 'both') {
+resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (deployWindowsPolicies && deployVmPolicies) {
   name: '${windowsPolicyDefinitionName}-VM'
   properties: {
     displayName: 'Deploy CrowdStrike Falcon sensor on Windows VMs'
@@ -626,7 +639,7 @@ resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
 }
 
 // Create Windows VMSS policy definition
-resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (operatingSystemLower == 'windows' || operatingSystemLower == 'both') {
+resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (deployWindowsPolicies && deployVmssPolicies) {
   name: '${windowsPolicyDefinitionName}-VMSS'
   properties: {
     displayName: 'Deploy CrowdStrike Falcon sensor on Windows VMSS'
@@ -725,7 +738,7 @@ resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@
 }
 
 // Create Windows VM policy assignment at management group level
-resource windowsVmPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'windows' || operatingSystemLower == 'both') {
+resource windowsVmPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (deployWindowsPolicies && deployVmPolicies) {
   name: 'CS-Falcon-Windows-VM-MG'
   location: deployment().location
   identity: {
@@ -740,7 +753,7 @@ resource windowsVmPolicyAssignment 'Microsoft.Authorization/policyAssignments@20
 }
 
 // Create Windows VMSS policy assignment at management group level
-resource windowsVmssPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'windows' || operatingSystemLower == 'both') {
+resource windowsVmssPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (deployWindowsPolicies && deployVmssPolicies) {
   name: 'CS-Falcon-Win-VMSS-MG'
   location: deployment().location
   identity: {
@@ -755,7 +768,7 @@ resource windowsVmssPolicyAssignment 'Microsoft.Authorization/policyAssignments@
 }
 
 // Create role assignments for the policies' managed identities (at management group scope)
-resource linuxVmContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
+resource linuxVmContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && deployLinuxPolicies && deployVmPolicies) {
   name: guid(linuxVmPolicyAssignment.id, vmRoleDefinitionId, managementGroup().id, 'LinuxVM')
   properties: {
     principalId: linuxVmPolicyAssignment!.identity.principalId
@@ -764,7 +777,7 @@ resource linuxVmContributorRoleAssignment 'Microsoft.Authorization/roleAssignmen
   }
 }
 
-resource linuxVmssContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
+resource linuxVmssContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && deployLinuxPolicies && deployVmssPolicies) {
   name: guid(linuxVmssPolicyAssignment.id, vmRoleDefinitionId, managementGroup().id, 'LinuxVMSS')
   properties: {
     principalId: linuxVmssPolicyAssignment!.identity.principalId
@@ -773,7 +786,7 @@ resource linuxVmssContributorRoleAssignment 'Microsoft.Authorization/roleAssignm
   }
 }
 
-resource windowsVmContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
+resource windowsVmContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && deployWindowsPolicies && deployVmPolicies) {
   name: guid(windowsVmPolicyAssignment.id, vmRoleDefinitionId, managementGroup().id, 'WindowsVM')
   properties: {
     principalId: windowsVmPolicyAssignment!.identity.principalId
@@ -782,7 +795,7 @@ resource windowsVmContributorRoleAssignment 'Microsoft.Authorization/roleAssignm
   }
 }
 
-resource windowsVmssContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
+resource windowsVmssContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && deployWindowsPolicies && deployVmssPolicies) {
   name: guid(windowsVmssPolicyAssignment.id, vmRoleDefinitionId, managementGroup().id, 'WindowsVMSS')
   properties: {
     principalId: windowsVmssPolicyAssignment!.identity.principalId
@@ -792,17 +805,17 @@ resource windowsVmssContributorRoleAssignment 'Microsoft.Authorization/roleAssig
 }
 
 // Outputs
-output linuxVmPolicyDefinitionId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmPolicyDefinition.id : ''
-output linuxVmssPolicyDefinitionId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmssPolicyDefinition.id : ''
-output windowsVmPolicyDefinitionId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsVmPolicyDefinition.id : ''
-output windowsVmssPolicyDefinitionId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsVmssPolicyDefinition.id : ''
-output linuxVmPolicyAssignmentId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmPolicyAssignment.id : ''
-output linuxVmssPolicyAssignmentId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmssPolicyAssignment.id : ''
-output windowsVmPolicyAssignmentId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsVmPolicyAssignment.id : ''
-output windowsVmssPolicyAssignmentId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsVmssPolicyAssignment.id : ''
-output linuxVmPolicyPrincipalId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmPolicyAssignment!.identity.principalId : ''
-output linuxVmssPolicyPrincipalId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmssPolicyAssignment!.identity.principalId : ''
-output windowsVmPolicyPrincipalId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsVmPolicyAssignment!.identity.principalId : ''
-output windowsVmssPolicyPrincipalId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsVmssPolicyAssignment!.identity.principalId : ''
+output linuxVmPolicyDefinitionId string = (deployLinuxPolicies && deployVmPolicies) ? linuxVmPolicyDefinition.id : ''
+output linuxVmssPolicyDefinitionId string = (deployLinuxPolicies && deployVmssPolicies) ? linuxVmssPolicyDefinition.id : ''
+output windowsVmPolicyDefinitionId string = (deployWindowsPolicies && deployVmPolicies) ? windowsVmPolicyDefinition.id : ''
+output windowsVmssPolicyDefinitionId string = (deployWindowsPolicies && deployVmssPolicies) ? windowsVmssPolicyDefinition.id : ''
+output linuxVmPolicyAssignmentId string = (deployLinuxPolicies && deployVmPolicies) ? linuxVmPolicyAssignment.id : ''
+output linuxVmssPolicyAssignmentId string = (deployLinuxPolicies && deployVmssPolicies) ? linuxVmssPolicyAssignment.id : ''
+output windowsVmPolicyAssignmentId string = (deployWindowsPolicies && deployVmPolicies) ? windowsVmPolicyAssignment.id : ''
+output windowsVmssPolicyAssignmentId string = (deployWindowsPolicies && deployVmssPolicies) ? windowsVmssPolicyAssignment.id : ''
+output linuxVmPolicyPrincipalId string = (deployLinuxPolicies && deployVmPolicies) ? linuxVmPolicyAssignment!.identity.principalId : ''
+output linuxVmssPolicyPrincipalId string = (deployLinuxPolicies && deployVmssPolicies) ? linuxVmssPolicyAssignment!.identity.principalId : ''
+output windowsVmPolicyPrincipalId string = (deployWindowsPolicies && deployVmPolicies) ? windowsVmPolicyAssignment!.identity.principalId : ''
+output windowsVmssPolicyPrincipalId string = (deployWindowsPolicies && deployVmssPolicies) ? windowsVmssPolicyAssignment!.identity.principalId : ''
 output managementGroupId string = managementGroup().id
 output managementGroupName string = managementGroup().name
