@@ -1,12 +1,13 @@
 # Crowdstrike VM Extension Testing
 
-This directory contains testing tools for the Crowdstrike Falcon VM Extension that supports both Linux and Windows operating systems on VMs and VM Scale Sets (VMSS).
+This directory contains testing tools for the Crowdstrike Falcon VM Extension that supports both Linux and Windows operating systems on VMs, VM Scale Sets (VMSS), and Azure Arc-connected machines.
 
 ## Overview
 
 The testing framework allows you to:
 - Deploy VMs with the Crowdstrike Falcon extension across multiple operating systems
 - Deploy VMSS with the Crowdstrike Falcon extension (one Linux, one Windows x86_64)
+- Test the extension on existing Azure Arc-connected machines
 - Test Linux distributions (Ubuntu, Debian, RHEL, SLES) with x86_64 and arm64 architectures
 - Test Windows Server versions (2019, 2022, Core editions, Azure editions)
 - Run tests for specific platforms or all platforms
@@ -320,4 +321,110 @@ The script follows this flow:
 1. Parse command line options
 2. **VM tests**: Read and filter OS configurations from `test.config`, deploy each as a single VM
 3. **VMSS tests**: Deploy one Linux and one Windows x86_64 VMSS using fixed configurations
-4. Generate unified test summary
+4. **Arc tests**: Deploy the extension to existing Arc-connected machines and verify installation
+5. Generate unified test summary
+
+## Azure Arc Testing
+
+Arc testing validates the CrowdStrike Falcon extension on **existing** Azure Arc-connected machines. Unlike VM/VMSS tests, no infrastructure is deployed — the script targets machines that are already onboarded to Azure Arc.
+
+### Prerequisites
+
+1. **Azure CLI** with the `connectedmachine` extension installed:
+   ```bash
+   az extension add --name connectedmachine
+   ```
+2. One or more machines already connected to Azure Arc (`status == "Connected"`)
+3. The machines' resource group and names
+
+### Environment Variables
+
+```bash
+# Required for Arc tests
+export AZURE_SUBSCRIPTION_ID='your-subscription-id'
+export FALCON_CLIENT_ID='your-crowdstrike-client-id'
+export FALCON_CLIENT_SECRET='your-crowdstrike-client-secret'
+```
+
+No admin passwords are required — Arc tests do not create VMs.
+
+### Usage
+
+```bash
+# Test a single Arc machine
+./test-extension.sh --arc --arc-machine-name myArcMachine --arc-resource-group my-rg
+
+# Test multiple machines (comma-separated)
+./test-extension.sh --arc --arc-machine-name machine1,machine2 --arc-resource-group my-rg
+
+# Test multiple machines (repeated flag)
+./test-extension.sh --arc --arc-machine-name machine1 --arc-machine-name machine2 --arc-resource-group my-rg
+
+# Leave extension installed after test
+./test-extension.sh --arc --arc-machine-name myMachine --arc-resource-group my-rg --skip-cleanup
+
+# Custom timeout
+./test-extension.sh --arc --arc-machine-name myMachine --arc-resource-group my-rg --timeout 1800
+```
+
+### Arc Command Line Options
+
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `--arc` | yes | - | Enable Arc testing mode |
+| `--arc-machine-name` | yes | - | Machine name(s), comma-separated or repeated |
+| `--arc-resource-group` | yes | - | Resource group containing the Arc machines |
+| `--skip-cleanup` | no | false | Leave extension installed after test |
+| `--timeout` | no | `1200` | Timeout for extension status polling (seconds) |
+
+### Test Process
+
+For each Arc machine specified, the script:
+
+1. **Verifies connectivity** — checks the machine exists and status is "Connected"
+2. **Detects OS type** — queries the machine's `osType` (Linux or Windows)
+3. **Deploys the extension** — `az connectedmachine extension create` with `disable_provisioning_wait=true`
+4. **Polls provisioning state** — checks every 30 seconds until Succeeded, Failed, or timeout
+5. **Reports result** — pass/fail per machine
+6. **Cleans up** — removes the extension (unless `--skip-cleanup`)
+
+### Error Handling
+
+| Scenario | Behavior |
+|----------|----------|
+| Machine not found | WARNING, skip (non-fatal) |
+| Machine not in "Connected" state | WARNING, skip (non-fatal) |
+| Extension deployment fails | ERROR, continue to next machine |
+| Extension provisioning reaches "Failed" | ERROR, continue to next machine |
+| Polling times out | ERROR, continue to next machine |
+| Cleanup fails | WARNING (non-fatal) |
+
+The script exits with code 0 if no machines failed (skips are OK), or code 1 if any machine failed.
+
+### Debugging Arc Tests
+
+```bash
+# Check Arc machine status
+az connectedmachine show \
+  --resource-group my-rg \
+  --name myMachine \
+  --query "{status:status, osType:osType}"
+
+# Check extension status on Arc machine
+az connectedmachine extension show \
+  --resource-group my-rg \
+  --machine-name myMachine \
+  --name FalconSensorLinux
+
+# List all Arc machines in a resource group
+az connectedmachine list \
+  --resource-group my-rg \
+  --query "[].{name:name, status:status, os:osType}" \
+  --output table
+```
+
+### Notes
+
+- **CPU throttling**: Arc enforces a 5% CPU cap on extensions by default. The test sets `disable_provisioning_wait=true` to avoid timeouts caused by slow installation under this cap.
+- **No parallel execution**: Azure Arc does not execute extensions in parallel on a single machine. If another extension is installing, the CrowdStrike extension will queue.
+- **Extension type**: Linux machines get `FalconSensorLinux`, Windows machines get `FalconSensorWindows` — determined automatically from the machine's OS type.

@@ -120,7 +120,7 @@ These configuration parameters can be placed in the `settings` section:
 | `azure_vault_name` | Azure Key Vault name containing CrowdStrike credentials | None |
 | `azure_managed_identity_client_id` | Azure Managed Identity Client ID for Key Vault access (used with azure_vault_name) | None |
 | `cloud` | CrowdStrike cloud region (us-1, us-2, eu-1, us-gov-1, autodiscover) | autodiscover |
-| `member_cid` | Member CID for MSSP scenarios | None |
+| `member_cid` | Member CID for MSSP Parent/child scenarios. Requires Parent API Credentials and the Child CID. | None |
 | `sensor_update_policy` | Sensor update policy name. Configure this to match your organization's desired sensor update policy instead of using the pre-defined default. | platform_default |
 | `tags` | Comma-separated list of sensor tags | None |
 | `disable_proxy` | Disable proxy settings | false |
@@ -135,6 +135,9 @@ These configuration parameters can be placed in the `settings` section:
 | `disable_start` | Prevent sensor from starting until reboot | false |
 | `provisioning_wait_time` | Provisioning timeout in milliseconds | 1200000 |
 | `vdi` | Enable virtual desktop infrastructure mode | false |
+
+> [!WARNING]
+> For Windows Azure Arc deployments, it is recommended to set `disable_provisioning_wait` to `true`. Arc enforces a 5% CPU cap on extension commands, which can cause the provisioning wait to exceed the enable command timeout. The sensor will still provision in the background after installation completes. The Windows Arc ARM template defaults this to `true`.
 
 ## Usage
 
@@ -167,6 +170,45 @@ az vm extension set \
   --settings '{
     "cloud": "autodiscover",
     "tags": "azure,production"
+  }' \
+  --protected-settings '{
+    "client_id": "YOUR_CLIENT_ID",
+    "client_secret": "YOUR_CLIENT_SECRET"
+  }'
+```
+
+### Azure Arc
+
+#### Linux
+```bash
+az connectedmachine extension create \
+  --resource-group myResourceGroup \
+  --machine-name myArcMachine \
+  --name FalconSensorLinux \
+  --publisher Crowdstrike.Falcon \
+  --type FalconSensorLinux \
+  --settings '{
+    "cloud": "autodiscover",
+    "tags": "azure-arc,production"
+  }' \
+  --protected-settings '{
+    "client_id": "YOUR_CLIENT_ID",
+    "client_secret": "YOUR_CLIENT_SECRET"
+  }'
+```
+
+#### Windows
+```bash
+az connectedmachine extension create \
+  --resource-group myResourceGroup \
+  --machine-name myArcMachine \
+  --name FalconSensorWindows \
+  --publisher Crowdstrike.Falcon \
+  --type FalconSensorWindows \
+  --settings '{
+    "cloud": "autodiscover",
+    "disable_provisioning_wait": "true",
+    "tags": "azure-arc,production"
   }' \
   --protected-settings '{
     "client_id": "YOUR_CLIENT_ID",
@@ -298,6 +340,25 @@ In addition to the VM logs, you can also check the extension status and configur
 
 - Check extension status in Azure portal under VM → Extensions + applications
 - Use Azure CLI: `az vm extension show --resource-group <rg> --vm-name <vm> --name FalconSensorLinux` (or `FalconSensorWindows`)
+
+### Azure Arc-Connected Machines
+
+For Azure Arc-connected machines, the log locations differ from standard Azure VMs. The GuestConfig agent manages extension paths and provides them to the handler via `HandlerEnvironment.json`. Typical base paths are:
+
+- **Logs**: `/var/lib/GuestConfig/extension_logs/Crowdstrike.Falcon.FalconSensorLinux/` (Linux) or `C:\ProgramData\GuestConfig\extension_logs\Crowdstrike.Falcon.FalconSensorWindows\` (Windows)
+- **Working directory**: `/var/lib/GuestConfig/extension_packages/Crowdstrike.Falcon.FalconSensorLinux-<version>/` (Linux) or `C:\Packages\Plugins\Crowdstrike.Falcon.FalconSensorWindows\<version>\` (Windows)
+
+Check Arc extension status via Azure CLI:
+
+```bash
+az connectedmachine extension show \
+  --resource-group <rg> \
+  --machine-name <machine> \
+  --name FalconSensorLinux
+```
+
+> [!WARNING]
+> Azure Arc enforces a default 5% CPU cap on extension commands, which can cause slower provisioning. The Arc ARM template defaults `disable_provisioning_wait` to `true` to avoid enable command timeouts. The sensor will still provision in the background after installation completes.
 
 Review these logs for failures as to why the installation and deployment failed. When contacting CrowdStrike support or creating a GitHub issue, these logs should be provided.
 

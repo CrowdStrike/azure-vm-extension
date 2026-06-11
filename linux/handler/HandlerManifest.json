@@ -6,6 +6,7 @@
     "updateCommand": "update.sh",
     "enableCommand": "enable.sh",
     "disableCommand": "disable.sh",
+    "resetCommand": "reset.sh",
     "rebootAfterInstall": false,
     "reportHeartbeat": false,
     "updateMode": "UpdateWithoutInstall",

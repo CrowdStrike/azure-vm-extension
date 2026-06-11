@@ -29,6 +29,12 @@ CLEANUP_AFTER_TEST="true"
 WAIT_TIMEOUT=1200
 DEPLOYMENT_TYPE="both"
 AZURE_DEBUG="false"
+ARC_MODE="false"
+
+# Arc-specific settings
+ARC_MACHINE_NAMES=()
+ARC_RESOURCE_GROUP=""
+ARC_SKIP_CLEANUP="false"
 
 # Colors for output
 RED='\033[0;31m'
@@ -173,6 +179,24 @@ parse_arguments() {
                 AZURE_DEBUG="true"
                 shift
                 ;;
+            --arc)
+                ARC_MODE="true"
+                shift
+                ;;
+            --arc-machine-name)
+                IFS=',' read -ra _arc_names <<< "$2"
+                ARC_MACHINE_NAMES+=("${_arc_names[@]}")
+                shift 2
+                ;;
+            --arc-resource-group)
+                ARC_RESOURCE_GROUP="$2"
+                shift 2
+                ;;
+            --skip-cleanup)
+                ARC_SKIP_CLEANUP="true"
+                CLEANUP_AFTER_TEST="false"
+                shift
+                ;;
             -h|--help)
                 usage
                 exit 0
@@ -295,7 +319,20 @@ check_prerequisites() {
         fi
     done
 
-    # Check OS-specific passwords
+    # Check Arc-specific prerequisites
+    if [[ "$ARC_MODE" == "true" ]]; then
+        if [[ ${#ARC_MACHINE_NAMES[@]} -eq 0 ]]; then
+            log ERROR "--arc-machine-name is required in Arc mode"
+            exit 1
+        fi
+        if [[ -z "$ARC_RESOURCE_GROUP" ]]; then
+            log ERROR "--arc-resource-group is required in Arc mode"
+            exit 1
+        fi
+        log SUCCESS "Prerequisites check passed"
+        return
+    fi
+
     if [[ "$OS_TYPE" == "linux" || "$OS_TYPE" == "both" ]]; then
         validate_param "LINUX_ADMIN_PASSWORD" "$LINUX_ADMIN_PASSWORD" || exit 1
     fi
@@ -423,6 +460,194 @@ check_extension_status() {
 
     log ERROR "Extension status check timed out"
     return 1
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Azure Arc Extension Testing Functions
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Verify that an Arc machine exists and is connected
+check_arc_machine_connectivity() {
+    local resource_group=$1
+    local machine_name=$2
+
+    log INFO "Checking Arc connectivity for machine: $machine_name"
+
+    local status err
+    err=$(mktemp)
+    status=$(run_az_command connectedmachine show \
+        --resource-group "$resource_group" \
+        --name "$machine_name" \
+        --query "status" \
+        --output tsv 2>"$err") || {
+        local error_detail
+        error_detail=$(cat "$err")
+        rm -f "$err"
+        log WARNING "Failed to query machine '$machine_name' in resource group '$resource_group'"
+        [[ -n "$error_detail" ]] && log WARNING "$error_detail"
+        return 1
+    }
+    rm -f "$err"
+
+    if [[ "$status" == "Connected" ]]; then
+        log SUCCESS "Machine '$machine_name' is connected to Arc"
+        return 0
+    else
+        log WARNING "Machine '$machine_name' status is '$status' (expected 'Connected')"
+        return 1
+    fi
+}
+
+# Determine OS type of an Arc-connected machine
+get_arc_machine_os_type() {
+    local resource_group=$1
+    local machine_name=$2
+
+    run_az_command connectedmachine show \
+        --resource-group "$resource_group" \
+        --name "$machine_name" \
+        --query "osType" \
+        --output tsv 2>/dev/null || echo "Unknown"
+}
+
+# Deploy the CrowdStrike extension to an Arc-connected machine
+deploy_arc_extension() {
+    local resource_group=$1
+    local machine_name=$2
+    local os_type=$3
+
+    local extension_type
+    if [[ "$os_type" == "Linux" || "$os_type" == "linux" ]]; then
+        extension_type="TestFalconSensorLinux"
+    else
+        extension_type="TestFalconSensorWindows"
+    fi
+
+    local settings='{"disable_provisioning_wait":"true"}'
+    local protected_settings="{\"client_id\":\"$FALCON_CLIENT_ID\",\"client_secret\":\"$FALCON_CLIENT_SECRET\",\"tags\":\"arcextensiontest\",\"sensor_update_policy\":\"$SENSOR_UPDATE_POLICY\"}"
+
+    log INFO "Deploying extension '$extension_type' to Arc machine '$machine_name'..."
+
+    if run_az_command connectedmachine extension create \
+        --resource-group "$resource_group" \
+        --machine-name "$machine_name" \
+        --name "$extension_type" \
+        --publisher "$EXTENSION_PUBLISHER" \
+        --type "$extension_type" \
+        --settings "$settings" \
+        --protected-settings "$protected_settings" \
+        --no-wait \
+        --output none; then
+        log SUCCESS "Extension deployment initiated for '$machine_name'"
+        return 0
+    else
+        log ERROR "Failed to initiate extension deployment for '$machine_name'"
+        return 1
+    fi
+}
+
+# Poll extension provisioning state on an Arc machine
+check_arc_extension_status() {
+    local resource_group=$1
+    local machine_name=$2
+    local extension_name=$3
+    local deadline=$(( $(date +%s) + WAIT_TIMEOUT ))
+    local attempt=1
+
+    log INFO "Checking Arc extension status for machine: $machine_name (timeout: ${WAIT_TIMEOUT}s)"
+
+    while [[ $(date +%s) -lt $deadline ]]; do
+        local status
+        status=$(run_az_command connectedmachine extension show \
+            --resource-group "$resource_group" \
+            --machine-name "$machine_name" \
+            --name "$extension_name" \
+            --query "properties.provisioningState" \
+            --output tsv 2>/dev/null || echo "NotFound")
+
+        case $status in
+            "Succeeded")
+                log SUCCESS "Arc extension installed successfully on '$machine_name'"
+                return 0
+                ;;
+            "Failed")
+                log ERROR "Arc extension installation failed on '$machine_name'"
+                local error_msg
+                error_msg=$(run_az_command connectedmachine extension show \
+                    --resource-group "$resource_group" \
+                    --machine-name "$machine_name" \
+                    --name "$extension_name" \
+                    --query "properties.instanceView.status.message" \
+                    --output tsv 2>/dev/null || echo "")
+                [[ -n "$error_msg" ]] && log ERROR "Error details: $error_msg"
+                return 1
+                ;;
+            "Creating"|"Updating")
+                log INFO "Extension provisioning in progress (attempt $attempt)..."
+                sleep 30
+                ((attempt++))
+                ;;
+            "NotFound")
+                log WARNING "Extension not found yet (attempt $attempt)..."
+                sleep 30
+                ((attempt++))
+                ;;
+            *)
+                log WARNING "Unknown extension status: $status (attempt $attempt)..."
+                sleep 30
+                ((attempt++))
+                ;;
+        esac
+    done
+
+    log ERROR "Arc extension status check timed out for '$machine_name'"
+    return 1
+}
+
+# Remove the CrowdStrike extension from an Arc machine and wait for removal
+cleanup_arc_extension() {
+    local resource_group=$1
+    local machine_name=$2
+    local extension_name=$3
+
+    if [[ "$ARC_SKIP_CLEANUP" == "true" ]]; then
+        log WARNING "Skipping cleanup for '$machine_name' (--skip-cleanup enabled)"
+        return 0
+    fi
+
+    log INFO "Removing extension '$extension_name' from Arc machine '$machine_name'..."
+
+    if ! run_az_command connectedmachine extension delete \
+        --resource-group "$resource_group" \
+        --machine-name "$machine_name" \
+        --name "$extension_name" \
+        --yes \
+        --no-wait \
+        --output none; then
+        log WARNING "Failed to remove extension from '$machine_name' (non-fatal)"
+        return 0
+    fi
+
+    # Wait for extension to be fully removed
+    local deadline=$(( $(date +%s) + WAIT_TIMEOUT ))
+    local attempt=1
+
+    while [[ $(date +%s) -lt $deadline ]]; do
+        if ! run_az_command connectedmachine extension show \
+            --resource-group "$resource_group" \
+            --machine-name "$machine_name" \
+            --name "$extension_name" \
+            --output none 2>/dev/null; then
+            log SUCCESS "Extension removed from '$machine_name'"
+            return 0
+        fi
+        log INFO "Waiting for extension removal (attempt $attempt)..."
+        sleep 30
+        ((attempt++))
+    done
+
+    log WARNING "Extension removal timed out for '$machine_name' (non-fatal)"
+    return 0
 }
 
 # Generate VMSS parameters file from template
@@ -619,6 +844,17 @@ generate_parameters_file() {
     sed_inplace "s/$(escape_for_sed "\"0001-com-ubuntu-server-jammy\"")/$(escape_for_sed "\"$offer\"")/g" "$temp_params"
     sed_inplace "s/$(escape_for_sed "\"22_04-lts-gen2\"")/$(escape_for_sed "\"$sku\"")/g" "$temp_params"
     sed_inplace "s/$(escape_for_sed "\"x86_64\"")/$(escape_for_sed "\"${version_or_arch:-x86_64}\"")/g" "$temp_params"
+
+    # Arc-specific replacements
+    if [[ "$ARC_MODE" == "true" ]]; then
+        local machine_name="arc-${vm_name}"
+        local computer_name
+        computer_name=$(echo "$vm_name" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9' | head -c 15)
+        sed_inplace "s/$(escape_for_sed "cstest-arc")/$(escape_for_sed "$machine_name")/g" "$temp_params"
+        sed_inplace "s/$(escape_for_sed "cstestarc")/$(escape_for_sed "$computer_name")/g" "$temp_params"
+        sed_inplace "s/$(escape_for_sed "REPLACE_WITH_ARC_SP_ID")/$(escape_for_sed "$ARC_SERVICE_PRINCIPAL_ID")/g" "$temp_params"
+        sed_inplace "s/$(escape_for_sed "REPLACE_WITH_ARC_SP_SECRET")/$(escape_for_sed "$ARC_SERVICE_PRINCIPAL_SECRET")/g" "$temp_params"
+    fi
 }
 
 # Deploy and test configuration
@@ -915,6 +1151,96 @@ run_tests() {
     fi
 }
 
+# Run Arc extension tests against existing connected machines
+run_arc_tests() {
+    local total_machines=${#ARC_MACHINE_NAMES[@]}
+    local passed_tests=0
+    local failed_tests=0
+    local skipped_tests=0
+    local start_time=$(date +%s)
+
+    log INFO "Starting Azure Arc Extension Testing"
+    log INFO "Machines: $total_machines, Resource Group: $ARC_RESOURCE_GROUP"
+    log INFO "Cleanup: $([[ "$ARC_SKIP_CLEANUP" == "true" ]] && echo "disabled" || echo "enabled")"
+    echo ""
+
+    log INFO "Machines to test:"
+    for machine in "${ARC_MACHINE_NAMES[@]}"; do
+        echo "  - $machine"
+    done
+    echo ""
+
+    for machine in "${ARC_MACHINE_NAMES[@]}"; do
+        echo "═══════════════════════════════════════════════════"
+        log INFO "Testing Arc machine: $machine"
+
+        # Step 1: Verify connectivity
+        if ! check_arc_machine_connectivity "$ARC_RESOURCE_GROUP" "$machine"; then
+            log WARNING "Skipping '$machine' — not connected to Arc"
+            ((skipped_tests++))
+            echo ""
+            continue
+        fi
+
+        # Step 2: Determine OS type
+        local os_type
+        os_type=$(get_arc_machine_os_type "$ARC_RESOURCE_GROUP" "$machine")
+        log INFO "Detected OS type: $os_type"
+
+        local extension_name
+        if [[ "$os_type" == "Linux" || "$os_type" == "linux" ]]; then
+            extension_name="TestFalconSensorLinux"
+        else
+            extension_name="TestFalconSensorWindows"
+        fi
+
+        # Step 3: Deploy extension
+        if ! deploy_arc_extension "$ARC_RESOURCE_GROUP" "$machine" "$os_type"; then
+            log ERROR "❌ Arc machine '$machine': Extension deployment FAILED"
+            ((failed_tests++))
+            echo ""
+            continue
+        fi
+
+        # Step 4: Poll for provisioning state
+        if check_arc_extension_status "$ARC_RESOURCE_GROUP" "$machine" "$extension_name"; then
+            log SUCCESS "✅ Arc machine '$machine': Extension test PASSED"
+            ((passed_tests++))
+        else
+            log ERROR "❌ Arc machine '$machine': Extension test FAILED"
+            ((failed_tests++))
+        fi
+
+        # Step 5: Cleanup
+        cleanup_arc_extension "$ARC_RESOURCE_GROUP" "$machine" "$extension_name"
+        echo ""
+    done
+
+    # Summary
+    local end_time=$(date +%s)
+    local total_duration=$((end_time - start_time))
+    local total_minutes=$((total_duration / 60))
+    local remaining_seconds=$((total_duration % 60))
+
+    echo "═══════════════════════════════════════════════════"
+    log INFO "ARC TEST SUMMARY"
+    echo "Total machines: $total_machines, Passed: $passed_tests, Failed: $failed_tests, Skipped: $skipped_tests"
+    echo "Duration: ${total_minutes}m ${remaining_seconds}s"
+    echo ""
+
+    if [[ $failed_tests -eq 0 ]]; then
+        if [[ $skipped_tests -gt 0 ]]; then
+            log WARNING "All reachable machines passed ($skipped_tests skipped)"
+        else
+            log SUCCESS "🎉 All Arc tests passed!"
+        fi
+        return 0
+    else
+        log ERROR "💥 $failed_tests Arc test(s) failed"
+        return 1
+    fi
+}
+
 # Print usage
 usage() {
     cat << EOF
@@ -944,6 +1270,16 @@ FILE OPTIONS:
   --config PATH             Path to test configuration file
                             (default: ./test.config)
 
+ARC OPTIONS:
+  --arc                     Enable Azure Arc mode (test existing Arc machines)
+  --arc-machine-name NAME   Name of Arc-connected machine to test. Accepts
+                            comma-separated values or repeated flags for multiple
+                            machines. Required in Arc mode.
+  --arc-resource-group RG   Resource group containing the Arc machine(s).
+                            Required in Arc mode.
+  --skip-cleanup            Leave extension installed after test
+                            (default: uninstall after test)
+
 ADVANCED OPTIONS:
   --subscription-id ID      Azure subscription ID
                             (default: AZURE_SUBSCRIPTION_ID env var)
@@ -955,8 +1291,8 @@ REQUIRED ENVIRONMENT VARIABLES:
   AZURE_SUBSCRIPTION_ID     Azure subscription ID
   FALCON_CLIENT_ID          Crowdstrike API client ID
   FALCON_CLIENT_SECRET      Crowdstrike API client secret
-  LINUX_ADMIN_PASSWORD      Linux VM admin password (for Linux tests)
-  WINDOWS_ADMIN_PASSWORD    Windows VM admin password (for Windows tests)
+  LINUX_ADMIN_PASSWORD      Linux VM admin password (for VM/VMSS tests)
+  WINDOWS_ADMIN_PASSWORD    Windows VM admin password (for VM/VMSS tests)
 
 EXAMPLES:
   # Test both VM and VMSS for all operating systems (default)
@@ -985,6 +1321,15 @@ EXAMPLES:
 
   # Test with custom config file
   $0 --config ./custom-test.config
+
+  # Test extension on an existing Arc-connected machine
+  $0 --arc --arc-machine-name myArcMachine --arc-resource-group my-rg
+
+  # Test multiple Arc machines
+  $0 --arc --arc-machine-name machine1,machine2 --arc-resource-group my-rg
+
+  # Test Arc machine without cleanup
+  $0 --arc --arc-machine-name myMachine --arc-resource-group my-rg --skip-cleanup
 EOF
 }
 
@@ -996,12 +1341,16 @@ main() {
 
     local exit_code=0
 
-    if [[ "$DEPLOYMENT_TYPE" == "vm" || "$DEPLOYMENT_TYPE" == "both" ]]; then
-        run_tests || exit_code=1
-    fi
+    if [[ "$ARC_MODE" == "true" ]]; then
+        run_arc_tests || exit_code=1
+    else
+        if [[ "$DEPLOYMENT_TYPE" == "vm" || "$DEPLOYMENT_TYPE" == "both" ]]; then
+            run_tests || exit_code=1
+        fi
 
-    if [[ "$DEPLOYMENT_TYPE" == "vmss" || "$DEPLOYMENT_TYPE" == "both" ]]; then
-        run_vmss_tests || exit_code=1
+        if [[ "$DEPLOYMENT_TYPE" == "vmss" || "$DEPLOYMENT_TYPE" == "both" ]]; then
+            run_vmss_tests || exit_code=1
+        fi
     fi
 
     exit $exit_code

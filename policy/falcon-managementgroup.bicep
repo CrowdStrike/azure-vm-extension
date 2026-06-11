@@ -22,6 +22,9 @@ param policyEffect string = 'DeployIfNotExists'
 @description('Create role assignments for policy managed identities (requires Owner or User Access Administrator role)')
 param createRoleAssignments bool = true
 
+@description('Deploy to Azure Arc-connected servers')
+param deployToArc bool = true
+
 @description('Extension configuration settings')
 param extensionSettings object = {
   handlerVersion: '0.0'
@@ -43,6 +46,8 @@ param disableProxy bool = false
 @secure()
 param provisioningToken string = ''
 param azureManagedIdentityClientId string = ''
+@description('Full ARM resource ID of the user-assigned managed identity to attach to VMs for Key Vault access')
+param azureManagedIdentityResourceId string = ''
 param proxySettings object = {
   proxyHost: ''
   proxyPort: ''
@@ -57,6 +62,8 @@ param vdi bool = false
 // Variables
 var operatingSystemLower = toLower(operatingSystem)
 var vmRoleDefinitionId = '9980e02c-c2be-4d73-94e8-173b1dc7cf3c' // Virtual Machine Contributor
+var arcRoleDefinitionId = 'cd570a14-e51a-42ad-bac8-bafd67325302' // Azure Connected Machine Resource Administrator
+var managedIdentityOperatorRoleId = 'f1a07417-d97a-45cb-824c-7a7467783830' // Managed Identity Operator
 var linuxPolicyDefinitionName = '${policyDefinitionNamePrefix}-Linux'
 var windowsPolicyDefinitionName = '${policyDefinitionNamePrefix}-Windows'
 
@@ -113,6 +120,14 @@ var commonParameters = {
     metadata: {
       displayName: 'Azure Managed Identity Client ID'
       description: 'Azure User Assigned Managed Identity Client ID for Key Vault access'
+    }
+    defaultValue: ''
+  }
+  azureManagedIdentityResourceId: {
+    type: 'String'
+    metadata: {
+      displayName: 'User-Assigned Managed Identity Resource ID'
+      description: 'Full ARM resource ID of the user-assigned managed identity to attach to VMs for Key Vault access'
     }
     defaultValue: ''
   }
@@ -239,6 +254,7 @@ var commonTemplateParameters = {
   accessToken: { type: 'securestring' }
   azureVaultName: { type: 'string' }
   azureManagedIdentityClientId: { type: 'string' }
+  azureManagedIdentityResourceId: { type: 'string' }
   cloud: { type: 'string' }
   memberCid: { type: 'string' }
   sensorUpdatePolicy: { type: 'string' }
@@ -265,6 +281,7 @@ var commonTemplateParameterValues = {
   accessToken: { value: '[parameters(\'accessToken\')]' }
   azureVaultName: { value: '[parameters(\'azureVaultName\')]' }
   azureManagedIdentityClientId: { value: '[parameters(\'azureManagedIdentityClientId\')]' }
+  azureManagedIdentityResourceId: { value: '[parameters(\'azureManagedIdentityResourceId\')]' }
   cloud: { value: '[parameters(\'cloud\')]' }
   memberCid: { value: '[parameters(\'memberCid\')]' }
   sensorUpdatePolicy: { value: '[parameters(\'sensorUpdatePolicy\')]' }
@@ -290,6 +307,7 @@ var commonLinuxAssignmentParameters = {
   accessToken: { value: accessToken }
   azureVaultName: { value: azureVaultName }
   azureManagedIdentityClientId: { value: azureManagedIdentityClientId }
+  azureManagedIdentityResourceId: { value: azureManagedIdentityResourceId }
   cloud: { value: cloud }
   memberCid: { value: memberCid }
   sensorUpdatePolicy: { value: sensorUpdatePolicy }
@@ -329,6 +347,10 @@ resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
             field: 'Microsoft.Compute/virtualMachines/osProfile.linuxConfiguration'
             exists: 'true'
           }
+          {
+            field: 'Microsoft.Compute/virtualMachines/virtualMachineScaleSet.id'
+            exists: 'false'
+          }
         ]
       }
       then: {
@@ -353,6 +375,7 @@ resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
           }
           roleDefinitionIds: [
             tenantResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
+            tenantResourceId('Microsoft.Authorization/roleDefinitions', managedIdentityOperatorRoleId)
           ]
           deployment: {
             properties: {
@@ -363,10 +386,26 @@ resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                 parameters: commonTemplateParameters
                 resources: [
                   {
+                    condition: '[not(empty(parameters(\'azureManagedIdentityResourceId\')))]'
+                    name: '[parameters(\'resourceName\')]'
+                    type: 'Microsoft.Compute/virtualMachines'
+                    apiVersion: '2023-09-01'
+                    location: '[parameters(\'location\')]'
+                    identity: {
+                      type: 'UserAssigned'
+                      userAssignedIdentities: {
+                        '[parameters(\'azureManagedIdentityResourceId\')]': {}
+                      }
+                    }
+                  }
+                  {
                     name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
                     type: 'Microsoft.Compute/virtualMachines/extensions'
                     location: '[parameters(\'location\')]'
                     apiVersion: '2021-07-01'
+                    dependsOn: [
+                      '[parameters(\'resourceName\')]'
+                    ]
                     properties: {
                       publisher: 'Crowdstrike.Falcon'
                       type: 'FalconSensorLinux'
@@ -451,6 +490,7 @@ resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
           }
           roleDefinitionIds: [
             tenantResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
+            tenantResourceId('Microsoft.Authorization/roleDefinitions', managedIdentityOperatorRoleId)
           ]
           deployment: {
             properties: {
@@ -461,10 +501,26 @@ resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                 parameters: commonTemplateParameters
                 resources: [
                   {
+                    condition: '[not(empty(parameters(\'azureManagedIdentityResourceId\')))]'
+                    name: '[parameters(\'resourceName\')]'
+                    type: 'Microsoft.Compute/virtualMachineScaleSets'
+                    apiVersion: '2023-09-01'
+                    location: '[parameters(\'location\')]'
+                    identity: {
+                      type: 'UserAssigned'
+                      userAssignedIdentities: {
+                        '[parameters(\'azureManagedIdentityResourceId\')]': {}
+                      }
+                    }
+                  }
+                  {
                     name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
                     type: 'Microsoft.Compute/virtualMachineScaleSets/extensions'
                     location: '[parameters(\'location\')]'
                     apiVersion: '2021-07-01'
+                    dependsOn: [
+                      '[parameters(\'resourceName\')]'
+                    ]
                     properties: {
                       publisher: 'Crowdstrike.Falcon'
                       type: 'FalconSensorLinux'
@@ -551,6 +607,10 @@ resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
             field: 'Microsoft.Compute/virtualMachines/osProfile.windowsConfiguration'
             exists: 'true'
           }
+          {
+            field: 'Microsoft.Compute/virtualMachines/virtualMachineScaleSet.id'
+            exists: 'false'
+          }
         ]
       }
       then: {
@@ -575,6 +635,7 @@ resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
           }
           roleDefinitionIds: [
             tenantResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
+            tenantResourceId('Microsoft.Authorization/roleDefinitions', managedIdentityOperatorRoleId)
           ]
           deployment: {
             properties: {
@@ -585,10 +646,26 @@ resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                 parameters: windowsTemplateParameters
                 resources: [
                   {
+                    condition: '[not(empty(parameters(\'azureManagedIdentityResourceId\')))]'
+                    name: '[parameters(\'resourceName\')]'
+                    type: 'Microsoft.Compute/virtualMachines'
+                    apiVersion: '2023-09-01'
+                    location: '[parameters(\'location\')]'
+                    identity: {
+                      type: 'UserAssigned'
+                      userAssignedIdentities: {
+                        '[parameters(\'azureManagedIdentityResourceId\')]': {}
+                      }
+                    }
+                  }
+                  {
                     name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
                     type: 'Microsoft.Compute/virtualMachines/extensions'
                     location: '[parameters(\'location\')]'
                     apiVersion: '2021-07-01'
+                    dependsOn: [
+                      '[parameters(\'resourceName\')]'
+                    ]
                     properties: {
                       publisher: 'Crowdstrike.Falcon'
                       type: 'FalconSensorWindows'
@@ -678,6 +755,7 @@ resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@
           }
           roleDefinitionIds: [
             tenantResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
+            tenantResourceId('Microsoft.Authorization/roleDefinitions', managedIdentityOperatorRoleId)
           ]
           deployment: {
             properties: {
@@ -688,10 +766,26 @@ resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@
                 parameters: windowsTemplateParameters
                 resources: [
                   {
+                    condition: '[not(empty(parameters(\'azureManagedIdentityResourceId\')))]'
+                    name: '[parameters(\'resourceName\')]'
+                    type: 'Microsoft.Compute/virtualMachineScaleSets'
+                    apiVersion: '2023-09-01'
+                    location: '[parameters(\'location\')]'
+                    identity: {
+                      type: 'UserAssigned'
+                      userAssignedIdentities: {
+                        '[parameters(\'azureManagedIdentityResourceId\')]': {}
+                      }
+                    }
+                  }
+                  {
                     name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
                     type: 'Microsoft.Compute/virtualMachineScaleSets/extensions'
                     location: '[parameters(\'location\')]'
                     apiVersion: '2021-07-01'
+                    dependsOn: [
+                      '[parameters(\'resourceName\')]'
+                    ]
                     properties: {
                       publisher: 'Crowdstrike.Falcon'
                       type: 'FalconSensorWindows'
@@ -799,6 +893,287 @@ resource windowsVmssContributorRoleAssignment 'Microsoft.Authorization/roleAssig
   }
 }
 
+// Managed Identity Operator role assignments for VM policies (required for identity attachment)
+resource linuxVmMioRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && !empty(azureManagedIdentityResourceId) && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
+  name: guid(linuxVmPolicyAssignment.id, managedIdentityOperatorRoleId, managementGroup().id, 'LinuxVM-MIO')
+  properties: {
+    principalId: linuxVmPolicyAssignment!.identity.principalId
+    roleDefinitionId: tenantResourceId('Microsoft.Authorization/roleDefinitions', managedIdentityOperatorRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource windowsVmMioRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && !empty(azureManagedIdentityResourceId) && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
+  name: guid(windowsVmPolicyAssignment.id, managedIdentityOperatorRoleId, managementGroup().id, 'WindowsVM-MIO')
+  properties: {
+    principalId: windowsVmPolicyAssignment!.identity.principalId
+    roleDefinitionId: tenantResourceId('Microsoft.Authorization/roleDefinitions', managedIdentityOperatorRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource linuxVmssMioRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && !empty(azureManagedIdentityResourceId) && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
+  name: guid(linuxVmssPolicyAssignment.id, managedIdentityOperatorRoleId, managementGroup().id, 'LinuxVMSS-MIO')
+  properties: {
+    principalId: linuxVmssPolicyAssignment!.identity.principalId
+    roleDefinitionId: tenantResourceId('Microsoft.Authorization/roleDefinitions', managedIdentityOperatorRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource windowsVmssMioRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && !empty(azureManagedIdentityResourceId) && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
+  name: guid(windowsVmssPolicyAssignment.id, managedIdentityOperatorRoleId, managementGroup().id, 'WindowsVMSS-MIO')
+  properties: {
+    principalId: windowsVmssPolicyAssignment!.identity.principalId
+    roleDefinitionId: tenantResourceId('Microsoft.Authorization/roleDefinitions', managedIdentityOperatorRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// ──────────────────────────────────────────────────
+// Azure Arc-connected server policy definitions
+// ──────────────────────────────────────────────────
+
+// Create Linux Arc policy definition
+resource linuxArcPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (deployToArc && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
+  name: '${linuxPolicyDefinitionName}-Arc'
+  properties: {
+    displayName: 'Deploy CrowdStrike Falcon sensor on Linux Arc-connected servers'
+    description: 'This policy deploys CrowdStrike Falcon sensor on Linux Azure Arc-connected servers if not installed'
+    policyType: 'Custom'
+    mode: 'Indexed'
+    metadata: policyMetadata
+    parameters: commonParameters
+    policyRule: {
+      if: {
+        allOf: [
+          {
+            field: 'type'
+            equals: 'Microsoft.HybridCompute/machines'
+          }
+          {
+            field: 'Microsoft.HybridCompute/machines/osName'
+            equals: 'linux'
+          }
+        ]
+      }
+      then: {
+        effect: '[parameters(\'effect\')]'
+        details: {
+          type: 'Microsoft.HybridCompute/machines/extensions'
+          existenceCondition: {
+            allOf: [
+              {
+                field: 'Microsoft.HybridCompute/machines/extensions/publisher'
+                equals: 'Crowdstrike.Falcon'
+              }
+              {
+                field: 'Microsoft.HybridCompute/machines/extensions/type'
+                equals: 'FalconSensorLinux'
+              }
+              {
+                field: 'Microsoft.HybridCompute/machines/extensions/provisioningState'
+                equals: 'Succeeded'
+              }
+            ]
+          }
+          roleDefinitionIds: [
+            tenantResourceId('Microsoft.Authorization/roleDefinitions', arcRoleDefinitionId)
+          ]
+          deployment: {
+            properties: {
+              mode: 'incremental'
+              template: {
+                '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
+                contentVersion: '1.0.0.0'
+                parameters: commonTemplateParameters
+                resources: [
+                  {
+                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
+                    type: 'Microsoft.HybridCompute/machines/extensions'
+                    location: '[parameters(\'location\')]'
+                    apiVersion: '2024-07-10'
+                    properties: {
+                      publisher: 'Crowdstrike.Falcon'
+                      type: 'FalconSensorLinux'
+                      typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
+                      autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
+                      settings: {
+                        azure_vault_name: '[parameters(\'azureVaultName\')]'
+                        cloud: '[parameters(\'cloud\')]'
+                        member_cid: '[parameters(\'memberCid\')]'
+                        sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
+                        disable_proxy: '[parameters(\'disableProxy\')]'
+                        proxy_host: '[parameters(\'proxySettings\').proxyHost]'
+                        proxy_port: '[parameters(\'proxySettings\').proxyPort]'
+                        tags: '[parameters(\'tags\')]'
+                      }
+                      protectedSettings: {
+                        client_id: '[parameters(\'clientId\')]'
+                        client_secret: '[parameters(\'clientSecret\')]'
+                        access_token: '[parameters(\'accessToken\')]'
+                        provisioning_token: '[parameters(\'provisioningToken\')]'
+                      }
+                    }
+                  }
+                ]
+              }
+              parameters: commonTemplateParameterValues
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Create Windows Arc policy definition
+resource windowsArcPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (deployToArc && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
+  name: '${windowsPolicyDefinitionName}-Arc'
+  properties: {
+    displayName: 'Deploy CrowdStrike Falcon sensor on Windows Arc-connected servers'
+    description: 'This policy deploys CrowdStrike Falcon sensor on Windows Azure Arc-connected servers if not installed'
+    policyType: 'Custom'
+    mode: 'Indexed'
+    metadata: policyMetadata
+    parameters: union(commonParameters, windowsSpecificParameters)
+    policyRule: {
+      if: {
+        allOf: [
+          {
+            field: 'type'
+            equals: 'Microsoft.HybridCompute/machines'
+          }
+          {
+            field: 'Microsoft.HybridCompute/machines/osName'
+            equals: 'windows'
+          }
+        ]
+      }
+      then: {
+        effect: '[parameters(\'effect\')]'
+        details: {
+          type: 'Microsoft.HybridCompute/machines/extensions'
+          existenceCondition: {
+            allOf: [
+              {
+                field: 'Microsoft.HybridCompute/machines/extensions/publisher'
+                equals: 'Crowdstrike.Falcon'
+              }
+              {
+                field: 'Microsoft.HybridCompute/machines/extensions/type'
+                equals: 'FalconSensorWindows'
+              }
+              {
+                field: 'Microsoft.HybridCompute/machines/extensions/provisioningState'
+                equals: 'Succeeded'
+              }
+            ]
+          }
+          roleDefinitionIds: [
+            tenantResourceId('Microsoft.Authorization/roleDefinitions', arcRoleDefinitionId)
+          ]
+          deployment: {
+            properties: {
+              mode: 'incremental'
+              template: {
+                '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
+                contentVersion: '1.0.0.0'
+                parameters: windowsTemplateParameters
+                resources: [
+                  {
+                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
+                    type: 'Microsoft.HybridCompute/machines/extensions'
+                    location: '[parameters(\'location\')]'
+                    apiVersion: '2024-07-10'
+                    properties: {
+                      publisher: 'Crowdstrike.Falcon'
+                      type: 'FalconSensorWindows'
+                      typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
+                      autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
+                      settings: {
+                        azure_vault_name: '[parameters(\'azureVaultName\')]'
+                        cloud: '[parameters(\'cloud\')]'
+                        member_cid: '[parameters(\'memberCid\')]'
+                        sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
+                        disable_proxy: '[parameters(\'disableProxy\')]'
+                        proxy_host: '[parameters(\'proxySettings\').proxyHost]'
+                        proxy_port: '[parameters(\'proxySettings\').proxyPort]'
+                        tags: '[parameters(\'tags\')]'
+                        pac_url: '[parameters(\'pacUrl\')]'
+                        disable_provisioning_wait: '[parameters(\'disableProvisioningWait\')]'
+                        disable_start: '[parameters(\'disableStart\')]'
+                        provisioning_wait_time: '[parameters(\'provisioningWaitTime\')]'
+                        vdi: '[parameters(\'vdi\')]'
+                      }
+                      protectedSettings: {
+                        client_id: '[parameters(\'clientId\')]'
+                        client_secret: '[parameters(\'clientSecret\')]'
+                        access_token: '[parameters(\'accessToken\')]'
+                        provisioning_token: '[parameters(\'provisioningToken\')]'
+                      }
+                    }
+                  }
+                ]
+              }
+              parameters: windowsTemplateParameterValues
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Create Linux Arc policy assignment at management group level
+resource linuxArcPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (deployToArc && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
+  name: 'CS-Falcon-Linux-Arc-MG'
+  location: deployment().location
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    policyDefinitionId: linuxArcPolicyDefinition.id
+    displayName: 'Deploy CrowdStrike Falcon sensor on Linux Arc-connected servers (Management Group)'
+    description: 'This policy ensures CrowdStrike Falcon sensor is installed on all Linux Arc-connected servers in the management group'
+    parameters: commonLinuxAssignmentParameters
+  }
+}
+
+// Create Windows Arc policy assignment at management group level
+resource windowsArcPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (deployToArc && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
+  name: 'CS-Falcon-Win-Arc-MG'
+  location: deployment().location
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    policyDefinitionId: windowsArcPolicyDefinition.id
+    displayName: 'Deploy CrowdStrike Falcon sensor on Windows Arc-connected servers (Management Group)'
+    description: 'This policy ensures CrowdStrike Falcon sensor is installed on all Windows Arc-connected servers in the management group'
+    parameters: commonWindowsAssignmentParameters
+  }
+}
+
+// Create role assignments for Arc policies' managed identities
+resource linuxArcRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && deployToArc && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
+  name: guid(linuxArcPolicyAssignment.id, arcRoleDefinitionId, managementGroup().id, 'LinuxArc')
+  properties: {
+    principalId: linuxArcPolicyAssignment!.identity.principalId
+    roleDefinitionId: tenantResourceId('Microsoft.Authorization/roleDefinitions', arcRoleDefinitionId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource windowsArcRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && deployToArc && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
+  name: guid(windowsArcPolicyAssignment.id, arcRoleDefinitionId, managementGroup().id, 'WindowsArc')
+  properties: {
+    principalId: windowsArcPolicyAssignment!.identity.principalId
+    roleDefinitionId: tenantResourceId('Microsoft.Authorization/roleDefinitions', arcRoleDefinitionId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // Outputs
 output linuxVmPolicyDefinitionId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmPolicyDefinition.id : ''
 output linuxVmssPolicyDefinitionId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmssPolicyDefinition.id : ''
@@ -808,6 +1183,12 @@ output linuxVmPolicyAssignmentId string = (operatingSystemLower == 'linux' || op
 output linuxVmssPolicyAssignmentId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmssPolicyAssignment.id : ''
 output windowsVmPolicyAssignmentId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsVmPolicyAssignment.id : ''
 output windowsVmssPolicyAssignmentId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsVmssPolicyAssignment.id : ''
+output linuxArcPolicyDefinitionId string = (deployToArc && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) ? linuxArcPolicyDefinition.id : ''
+output windowsArcPolicyDefinitionId string = (deployToArc && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) ? windowsArcPolicyDefinition.id : ''
+output linuxArcPolicyAssignmentId string = (deployToArc && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) ? linuxArcPolicyAssignment.id : ''
+output windowsArcPolicyAssignmentId string = (deployToArc && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) ? windowsArcPolicyAssignment.id : ''
+output linuxArcPolicyPrincipalId string = (deployToArc && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) ? linuxArcPolicyAssignment!.identity.principalId : ''
+output windowsArcPolicyPrincipalId string = (deployToArc && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) ? windowsArcPolicyAssignment!.identity.principalId : ''
 output linuxVmPolicyPrincipalId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmPolicyAssignment!.identity.principalId : ''
 output linuxVmssPolicyPrincipalId string = (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? linuxVmssPolicyAssignment!.identity.principalId : ''
 output windowsVmPolicyPrincipalId string = (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? windowsVmPolicyAssignment!.identity.principalId : ''

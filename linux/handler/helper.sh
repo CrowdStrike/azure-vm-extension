@@ -2,10 +2,30 @@
 set -euo pipefail
 
 readonly VERSION="0.0.0"
+readonly HANDLER_DIR="${script_path:?script_path must be set before sourcing helper.sh}"
+readonly MAX_LOG_SIZE=5242880  # 5 MB
+
+# Check if running in an Azure Arc environment
+is_arc_environment() {
+    if [ -f "/opt/azcmagent/bin/himds" ]; then
+        return 0
+    fi
+    return 1
+}
 
 # Get the log folder path from HandlerEnvironment.json
 get_logs_folder() {
-    LOGS_FOLDER=$(cat HandlerEnvironment.json | grep -o '"logFolder": "[^"]*"' | cut -d'"' -f4)
+    LOGS_FOLDER=$(cat "$HANDLER_DIR/HandlerEnvironment.json" | grep -o '"logFolder":[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+}
+
+rotate_log() {
+    local log_file="$LOGS_FOLDER/cshandler.log"
+    if [ -f "$log_file" ]; then
+        local size=$(stat -c%s "$log_file" 2>/dev/null || stat -f%z "$log_file" 2>/dev/null || echo 0)
+        if [ "$size" -ge "$MAX_LOG_SIZE" ]; then
+            mv -f "$log_file" "${log_file}.1"
+        fi
+    fi
 }
 
 # Logging function
@@ -15,6 +35,7 @@ log() {
     local timestamp=$(date --utc --iso-8601=seconds)
 
     get_logs_folder
+    rotate_log
 
     echo "[$timestamp] $level $message"
     echo "[$timestamp] $level $message" >> "$LOGS_FOLDER/cshandler.log"
@@ -48,14 +69,52 @@ is_sensor_installed() {
 
 # Get the configuration file path from HandlerEnvironment.json
 get_config_file() {
-    local cfg_path=$(cat HandlerEnvironment.json | grep -o '"configFolder": "[^"]*"' | cut -d'"' -f4)
+    local cfg_path=$(cat "$HANDLER_DIR/HandlerEnvironment.json" | grep -o '"configFolder":[[:space:]]*"[^"]*"' | cut -d'"' -f4)
     local config_files_path="$cfg_path/*.settings"
     CONFIG_FILE=$(ls $config_files_path 2>/dev/null | sort -V | tail -1)
 }
 
 # Get the status folder path from HandlerEnvironment.json
 get_status_folder() {
-    STATUS_FOLDER=$(cat HandlerEnvironment.json | grep -o '"statusFolder": "[^"]*"' | cut -d'"' -f4)
+    STATUS_FOLDER=$(cat "$HANDLER_DIR/HandlerEnvironment.json" | grep -o '"statusFolder":[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+}
+
+# Extract host and port from a proxy URL, stripping scheme and credentials
+# e.g. http://user:password@proxy:8080 -> proxy:8080
+parse_proxy_url() {
+    local url="$1"
+    local stripped="$url"
+
+    stripped="${stripped#http://}"
+    stripped="${stripped#https://}"
+
+    if [[ "$stripped" == *"@"* ]]; then
+        stripped="${stripped#*@}"
+    fi
+
+    stripped="${stripped%%/*}"
+
+    echo "$stripped"
+}
+
+# Resolve proxy configuration from the Arc agent
+get_arc_proxy_config() {
+    if [ -n "${ProxySettings:-}" ]; then
+        HTTPS_PROXY=$(parse_proxy_url "$ProxySettings")
+        log "INFO" "Using Arc proxy from ProxySettings environment variable: $HTTPS_PROXY"
+        return
+    fi
+
+    local arc_config="/var/opt/azcmagent/localconfig.json"
+    if [ -f "$arc_config" ]; then
+        local proxy_url
+        proxy_url=$(grep -o '"proxy.url": *"[^"]*"' "$arc_config" | cut -d'"' -f4 || true)
+        if [ -n "$proxy_url" ]; then
+            HTTPS_PROXY=$(parse_proxy_url "$proxy_url")
+            log "INFO" "Using Arc proxy from localconfig.json: $HTTPS_PROXY"
+            return
+        fi
+    fi
 }
 
 # Parse proxy configuration from config file
@@ -63,6 +122,14 @@ get_proxy_config() {
     PROXY_HOST=""
     PROXY_PORT=""
     HTTPS_PROXY=""
+
+    # On Arc, inherit the agent's proxy settings first
+    if is_arc_environment; then
+        get_arc_proxy_config
+        if [ -n "$HTTPS_PROXY" ]; then
+            return
+        fi
+    fi
 
     if [ -f "$CONFIG_FILE" ]; then
         # Extract proxy_host and proxy_port from settings
@@ -145,6 +212,17 @@ run_falcon_installer() {
 
     # Get Config file
     get_config_file
+
+    # Azure Arc only supports system-assigned managed identities. If a user-assigned
+    # managed identity client ID is configured, warn and clear it so the installer
+    # falls back to system-assigned identity via HIMDS challenge/response.
+    if is_arc_environment && [ -f "$CONFIG_FILE" ]; then
+        local mi_client_id
+        mi_client_id=$(grep -o '"azure_managed_identity_client_id": *"[^"]*"' "$CONFIG_FILE" | cut -d'"' -f4 | head -1 || true)
+        if [ -n "$mi_client_id" ]; then
+            log "WARN" "[$operation_upper] Azure Arc does not support user-assigned managed identities."
+        fi
+    fi
 
     # Get proxy configuration
     get_proxy_config
