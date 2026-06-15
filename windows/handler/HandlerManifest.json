@@ -6,6 +6,7 @@
     "updateCommand": "update.cmd",
     "enableCommand": "enable.cmd",
     "disableCommand": "disable.cmd",
+    "resetCommand": "reset.cmd",
     "rebootAfterInstall": false,
     "reportHeartbeat": false,
     "updateMode": "UpdateWithoutInstall",

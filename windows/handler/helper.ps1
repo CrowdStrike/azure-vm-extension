@@ -1,11 +1,28 @@
 # helper.ps1
 
 $VERSION = "0.0.0"
+$MAX_LOG_SIZE = 5MB
+
+# Check if running in an Azure Arc environment
+function Test-ArcEnvironment {
+    $arcPath = Join-Path $env:ProgramFiles "AzureConnectedMachineAgent\himds.exe"
+    return Test-Path -Path $arcPath
+}
 
 # Get the log folder path from HandlerEnvironment.json
 function Get-LogsFolder {
-    $handlerEnv = Get-Content -Raw -Path "HandlerEnvironment.json" | ConvertFrom-Json
+    $handlerEnv = Get-Content -Raw -Path (Join-Path $PSScriptRoot "HandlerEnvironment.json") | ConvertFrom-Json
     $script:LOGS_FOLDER = $handlerEnv[0].handlerEnvironment.logFolder
+}
+
+function Rotate-Log {
+    $logFile = Join-Path $LOGS_FOLDER "cshandler.log"
+    if (Test-Path $logFile) {
+        $size = (Get-Item $logFile).Length
+        if ($size -ge $MAX_LOG_SIZE) {
+            Move-Item -Path $logFile -Destination "$logFile.1" -Force
+        }
+    }
 }
 
 # Logging function
@@ -20,6 +37,8 @@ function Log {
     if (-not $script:LOGS_FOLDER) {
         Get-LogsFolder
     }
+
+    Rotate-Log
 
     $logMessage = "[$timestamp] $level $message"
     Write-Host $logMessage
@@ -52,7 +71,7 @@ function Is-SensorInstalled {
 
 # Get the configuration file path from HandlerEnvironment.json
 function Get-ConfigFile {
-    $handlerEnv = Get-Content -Raw -Path "HandlerEnvironment.json" | ConvertFrom-Json
+    $handlerEnv = Get-Content -Raw -Path (Join-Path $PSScriptRoot "HandlerEnvironment.json") | ConvertFrom-Json
     $cfgPath = $handlerEnv[0].handlerEnvironment.configFolder
     $configFilesPath = Join-Path -Path $cfgPath -ChildPath "*.settings"
 
@@ -67,8 +86,44 @@ function Get-ConfigFile {
 
 # Get the status folder path from HandlerEnvironment.json
 function Get-StatusFolder {
-    $handlerEnv = Get-Content -Raw -Path "HandlerEnvironment.json" | ConvertFrom-Json
+    $handlerEnv = Get-Content -Raw -Path (Join-Path $PSScriptRoot "HandlerEnvironment.json") | ConvertFrom-Json
     $script:STATUS_FOLDER = $handlerEnv[0].handlerEnvironment.statusFolder
+}
+
+# Extract host and port from a proxy URL, stripping scheme and credentials
+# e.g. http://user:password@proxy:8080 -> proxy:8080
+function Parse-ProxyUrl {
+    param([string]$Url)
+
+    $stripped = $Url
+    $stripped = $stripped -replace '^https?://', ''
+    $stripped = $stripped -replace '^[^@]+@', ''
+    $stripped = $stripped -replace '/.*$', ''
+
+    return $stripped
+}
+
+# Resolve proxy configuration from the Arc agent
+function Get-ArcProxyConfig {
+    if ($env:ProxySettings) {
+        $script:HTTPS_PROXY = Parse-ProxyUrl $env:ProxySettings
+        Log "INFO" "Using Arc proxy from ProxySettings environment variable: $HTTPS_PROXY"
+        return
+    }
+
+    $arcConfig = Join-Path $env:ProgramData "AzureConnectedMachineAgent\Config\localconfig.json"
+    if (Test-Path -Path $arcConfig) {
+        try {
+            $config = Get-Content -Raw -Path $arcConfig | ConvertFrom-Json
+            if ($config.'proxy.url') {
+                $script:HTTPS_PROXY = Parse-ProxyUrl $config.'proxy.url'
+                Log "INFO" "Using Arc proxy from localconfig.json: $HTTPS_PROXY"
+                return
+            }
+        } catch {
+            Log "WARN" "Failed to parse Arc proxy config: $_"
+        }
+    }
 }
 
 # Parse proxy configuration from config file
@@ -76,6 +131,14 @@ function Get-ProxyConfig {
     $script:PROXY_HOST = ""
     $script:PROXY_PORT = ""
     $script:HTTPS_PROXY = ""
+
+    # On Arc, inherit the agent's proxy settings first
+    if (Test-ArcEnvironment) {
+        Get-ArcProxyConfig
+        if ($HTTPS_PROXY) {
+            return
+        }
+    }
 
     if ($CONFIG_FILE -and (Test-Path -Path $CONFIG_FILE)) {
         try {
@@ -208,6 +271,24 @@ function Invoke-FalconInstaller {
     # Get Config file - this sets $CONFIG_FILE
     Get-ConfigFile
 
+    # Azure Arc only supports system-assigned managed identities. If a user-assigned
+    # managed identity client ID is configured, warn and clear it so the installer
+    # falls back to system-assigned identity via HIMDS challenge/response.
+    if ((Test-ArcEnvironment) -and $CONFIG_FILE -and (Test-Path -Path $CONFIG_FILE)) {
+        try {
+            $cfgJson = Get-Content -Raw -Path $CONFIG_FILE | ConvertFrom-Json
+            if ($cfgJson.runtimeSettings -and $cfgJson.runtimeSettings[0].handlerSettings) {
+                $pubSettings = $cfgJson.runtimeSettings[0].handlerSettings.publicSettings
+                $miClientId = $pubSettings.azure_managed_identity_client_id
+                if ($miClientId) {
+                    Log "WARN" "[$operationTag] Azure Arc does not support user-assigned managed identities."
+                }
+            }
+        } catch {
+            Log "WARN" "[$operationTag] Failed to parse config for managed identity check: $_"
+        }
+    }
+
     # Get proxy configuration
     Get-ProxyConfig
 
@@ -249,6 +330,30 @@ function Invoke-FalconInstaller {
     # Add uninstall flag if operation is uninstall
     if ($Operation -eq "Uninstall") {
         $installerArgs = @("--uninstall") + $installerArgs
+    }
+
+    # On Arc, append --disable-provisioning-wait if the setting doesn't exist in the config.
+    # If the customer explicitly set it (true or false), respect their choice.
+    if ((Test-ArcEnvironment) -and $Operation -ne "Uninstall") {
+        $provWaitExists = $false
+        if ($CONFIG_FILE -and (Test-Path -Path $CONFIG_FILE)) {
+            try {
+                $cfgContent = Get-Content -Raw -Path $CONFIG_FILE | ConvertFrom-Json
+                if ($cfgContent.runtimeSettings -and $cfgContent.runtimeSettings[0].handlerSettings) {
+                    $pubSettings = $cfgContent.runtimeSettings[0].handlerSettings.publicSettings
+                    if ($null -ne $pubSettings.PSObject.Properties.Item("disable_provisioning_wait")) {
+                        $provWaitExists = $true
+                    }
+                }
+            } catch {
+                Log "WARN" "[$operationTag] Failed to parse config for provisioning wait check: $_"
+            }
+        }
+
+        if (-not $provWaitExists) {
+            Log "INFO" "[$operationTag] Arc environment detected, appending --disable-provisioning-wait"
+            $installerArgs += "--disable-provisioning-wait"
+        }
     }
 
     Log "INFO" "[$operationTag] running the Falcon installer..."

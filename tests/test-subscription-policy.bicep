@@ -9,7 +9,7 @@ targetScope = 'subscription'
 param operatingSystem string = 'both'
 
 @description('Policy definition name prefix')
-param policyDefinitionNamePrefix string = 'CS-Falcon-Policy'
+param policyDefinitionNamePrefix string = 'CS-Falcon-Policy-Test'
 
 @description('Effect for the policy assignment (DeployIfNotExists, AuditIfNotExists, Disabled)')
 @allowed([
@@ -330,8 +330,8 @@ var commonWindowsAssignmentParameters = union(commonLinuxAssignmentParameters, {
 resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (operatingSystemLower == 'linux' || operatingSystemLower == 'both') {
   name: '${linuxPolicyDefinitionName}-VM'
   properties: {
-    displayName: 'Deploy CrowdStrike Falcon sensor on Linux VMs'
-    description: 'This policy deploys CrowdStrike Falcon sensor on Linux VMs if not installed'
+    displayName: 'Test - Deploy CrowdStrike Falcon sensor on Linux VMs'
+    description: 'Test policy - deploys CrowdStrike Falcon test extension on Linux VMs if not installed'
     policyType: 'Custom'
     mode: 'Indexed'
     metadata: policyMetadata
@@ -365,7 +365,7 @@ resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
               }
               {
                 field: 'Microsoft.Compute/virtualMachines/extensions/type'
-                equals: 'FalconSensorLinux'
+                equals: 'TestFalconSensorLinux'
               }
               {
                 field: 'Microsoft.Compute/virtualMachines/extensions/provisioningState'
@@ -399,7 +399,7 @@ resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                     }
                   }
                   {
-                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
+                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeTestFalconSensor\')]'
                     type: 'Microsoft.Compute/virtualMachines/extensions'
                     location: '[parameters(\'location\')]'
                     apiVersion: '2021-07-01'
@@ -408,7 +408,7 @@ resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                     ]
                     properties: {
                       publisher: 'Crowdstrike.Falcon'
-                      type: 'FalconSensorLinux'
+                      type: 'TestFalconSensorLinux'
                       typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
                       autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
                       settings: {
@@ -445,8 +445,8 @@ resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
 resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (operatingSystemLower == 'linux' || operatingSystemLower == 'both') {
   name: '${linuxPolicyDefinitionName}-VMSS'
   properties: {
-    displayName: 'Deploy CrowdStrike Falcon sensor on Linux VMSS'
-    description: 'This policy deploys CrowdStrike Falcon sensor on Linux Virtual Machine Scale Sets if not installed'
+    displayName: 'Test - Deploy CrowdStrike Falcon sensor on Linux VMSS'
+    description: 'Test policy - deploys CrowdStrike Falcon test extension on Linux Virtual Machine Scale Sets if not installed'
     policyType: 'Custom'
     mode: 'Indexed'
     metadata: policyMetadata
@@ -480,7 +480,7 @@ resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
               }
               {
                 field: 'Microsoft.Compute/virtualMachineScaleSets/extensions/type'
-                equals: 'FalconSensorLinux'
+                equals: 'TestFalconSensorLinux'
               }
               {
                 field: 'Microsoft.Compute/virtualMachineScaleSets/extensions/provisioningState'
@@ -514,7 +514,7 @@ resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                     }
                   }
                   {
-                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
+                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeTestFalconSensor\')]'
                     type: 'Microsoft.Compute/virtualMachineScaleSets/extensions'
                     location: '[parameters(\'location\')]'
                     apiVersion: '2021-07-01'
@@ -523,7 +523,7 @@ resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                     ]
                     properties: {
                       publisher: 'Crowdstrike.Falcon'
-                      type: 'FalconSensorLinux'
+                      type: 'TestFalconSensorLinux'
                       typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
                       autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
                       settings: {
@@ -558,30 +558,30 @@ resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
 
 // Create Linux VM policy assignment at subscription level
 resource linuxVmPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'linux' || operatingSystemLower == 'both') {
-  name: 'CS-Falcon-Linux-VM-${take(subscription().subscriptionId, 8)}'
+  name: 'CS-Test-Linux-VM-${take(subscription().subscriptionId, 8)}'
   location: deployment().location
   identity: {
     type: 'SystemAssigned'
   }
   properties: {
     policyDefinitionId: linuxVmPolicyDefinition.id
-    displayName: 'Deploy CrowdStrike Falcon sensor on Linux VMs (Subscription)'
-    description: 'This policy ensures CrowdStrike Falcon sensor is installed on all Linux VMs in the subscription'
+    displayName: 'Test - Deploy CrowdStrike Falcon sensor on Linux VMs (Subscription)'
+    description: 'Test policy - ensures CrowdStrike Falcon test extension is installed on all Linux VMs in the subscription'
     parameters: commonLinuxAssignmentParameters
   }
 }
 
 // Create Linux VMSS policy assignment at subscription level
 resource linuxVmssPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'linux' || operatingSystemLower == 'both') {
-  name: 'CS-Falcon-Linux-VMSS-${take(subscription().subscriptionId, 8)}'
+  name: 'CS-Test-Linux-VMSS-${take(subscription().subscriptionId, 8)}'
   location: deployment().location
   identity: {
     type: 'SystemAssigned'
   }
   properties: {
     policyDefinitionId: linuxVmssPolicyDefinition.id
-    displayName: 'Deploy CrowdStrike Falcon sensor on Linux VMSS (Subscription)'
-    description: 'This policy ensures CrowdStrike Falcon sensor is installed on all Linux VMSS in the subscription'
+    displayName: 'Test - Deploy CrowdStrike Falcon sensor on Linux VMSS (Subscription)'
+    description: 'Test policy - ensures CrowdStrike Falcon test extension is installed on all Linux VMSS in the subscription'
     parameters: commonLinuxAssignmentParameters
   }
 }
@@ -590,8 +590,8 @@ resource linuxVmssPolicyAssignment 'Microsoft.Authorization/policyAssignments@20
 resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (operatingSystemLower == 'windows' || operatingSystemLower == 'both') {
   name: '${windowsPolicyDefinitionName}-VM'
   properties: {
-    displayName: 'Deploy CrowdStrike Falcon sensor on Windows VMs'
-    description: 'This policy deploys CrowdStrike Falcon sensor on Windows VMs if not installed'
+    displayName: 'Test - Deploy CrowdStrike Falcon sensor on Windows VMs'
+    description: 'Test policy - deploys CrowdStrike Falcon test extension on Windows VMs if not installed'
     policyType: 'Custom'
     mode: 'Indexed'
     metadata: policyMetadata
@@ -625,7 +625,7 @@ resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
               }
               {
                 field: 'Microsoft.Compute/virtualMachines/extensions/type'
-                equals: 'FalconSensorWindows'
+                equals: 'TestFalconSensorWindows'
               }
               {
                 field: 'Microsoft.Compute/virtualMachines/extensions/provisioningState'
@@ -659,7 +659,7 @@ resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                     }
                   }
                   {
-                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
+                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeTestFalconSensor\')]'
                     type: 'Microsoft.Compute/virtualMachines/extensions'
                     location: '[parameters(\'location\')]'
                     apiVersion: '2021-07-01'
@@ -668,7 +668,7 @@ resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                     ]
                     properties: {
                       publisher: 'Crowdstrike.Falcon'
-                      type: 'FalconSensorWindows'
+                      type: 'TestFalconSensorWindows'
                       typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
                       autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
                       settings: {
@@ -710,8 +710,8 @@ resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
 resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (operatingSystemLower == 'windows' || operatingSystemLower == 'both') {
   name: '${windowsPolicyDefinitionName}-VMSS'
   properties: {
-    displayName: 'Deploy CrowdStrike Falcon sensor on Windows VMSS'
-    description: 'This policy deploys CrowdStrike Falcon sensor on Windows Virtual Machine Scale Sets if not installed'
+    displayName: 'Test - Deploy CrowdStrike Falcon sensor on Windows VMSS'
+    description: 'Test policy - deploys CrowdStrike Falcon test extension on Windows Virtual Machine Scale Sets if not installed'
     policyType: 'Custom'
     mode: 'Indexed'
     metadata: policyMetadata
@@ -745,7 +745,7 @@ resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@
               }
               {
                 field: 'Microsoft.Compute/virtualMachineScaleSets/extensions/type'
-                equals: 'FalconSensorWindows'
+                equals: 'TestFalconSensorWindows'
               }
               {
                 field: 'Microsoft.Compute/virtualMachineScaleSets/extensions/provisioningState'
@@ -779,7 +779,7 @@ resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@
                     }
                   }
                   {
-                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
+                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeTestFalconSensor\')]'
                     type: 'Microsoft.Compute/virtualMachineScaleSets/extensions'
                     location: '[parameters(\'location\')]'
                     apiVersion: '2021-07-01'
@@ -788,7 +788,7 @@ resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@
                     ]
                     properties: {
                       publisher: 'Crowdstrike.Falcon'
-                      type: 'FalconSensorWindows'
+                      type: 'TestFalconSensorWindows'
                       typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
                       autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
                       settings: {
@@ -828,37 +828,37 @@ resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@
 
 // Create Windows VM policy assignment at subscription level
 resource windowsVmPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'windows' || operatingSystemLower == 'both') {
-  name: 'CS-Falcon-Windows-VM-${take(subscription().subscriptionId, 8)}'
+  name: 'CS-Test-Windows-VM-${take(subscription().subscriptionId, 8)}'
   location: deployment().location
   identity: {
     type: 'SystemAssigned'
   }
   properties: {
     policyDefinitionId: windowsVmPolicyDefinition.id
-    displayName: 'Deploy CrowdStrike Falcon sensor on Windows VMs (Subscription)'
-    description: 'This policy ensures CrowdStrike Falcon sensor is installed on all Windows VMs in the subscription'
+    displayName: 'Test - Deploy CrowdStrike Falcon sensor on Windows VMs (Subscription)'
+    description: 'Test policy - ensures CrowdStrike Falcon test extension is installed on all Windows VMs in the subscription'
     parameters: commonWindowsAssignmentParameters
   }
 }
 
 // Create Windows VMSS policy assignment at subscription level
 resource windowsVmssPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (operatingSystemLower == 'windows' || operatingSystemLower == 'both') {
-  name: 'CS-Falcon-Windows-VMSS-${take(subscription().subscriptionId, 8)}'
+  name: 'CS-Test-Windows-VMSS-${take(subscription().subscriptionId, 8)}'
   location: deployment().location
   identity: {
     type: 'SystemAssigned'
   }
   properties: {
     policyDefinitionId: windowsVmssPolicyDefinition.id
-    displayName: 'Deploy CrowdStrike Falcon sensor on Windows VMSS (Subscription)'
-    description: 'This policy ensures CrowdStrike Falcon sensor is installed on all Windows VMSS in the subscription'
+    displayName: 'Test - Deploy CrowdStrike Falcon sensor on Windows VMSS (Subscription)'
+    description: 'Test policy - ensures CrowdStrike Falcon test extension is installed on all Windows VMSS in the subscription'
     parameters: commonWindowsAssignmentParameters
   }
 }
 
 // Create role assignments for the policies' managed identities (at subscription scope)
 resource linuxVmContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
-  name: guid(linuxVmPolicyAssignment.id, vmRoleDefinitionId, subscription().id, 'LinuxVM')
+  name: guid(linuxVmPolicyAssignment.id, vmRoleDefinitionId, subscription().id, 'TestLinuxVM')
   properties: {
     principalId: linuxVmPolicyAssignment!.identity.principalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
@@ -867,7 +867,7 @@ resource linuxVmContributorRoleAssignment 'Microsoft.Authorization/roleAssignmen
 }
 
 resource linuxVmssContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
-  name: guid(linuxVmssPolicyAssignment.id, vmRoleDefinitionId, subscription().id, 'LinuxVMSS')
+  name: guid(linuxVmssPolicyAssignment.id, vmRoleDefinitionId, subscription().id, 'TestLinuxVMSS')
   properties: {
     principalId: linuxVmssPolicyAssignment!.identity.principalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
@@ -876,7 +876,7 @@ resource linuxVmssContributorRoleAssignment 'Microsoft.Authorization/roleAssignm
 }
 
 resource windowsVmContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
-  name: guid(windowsVmPolicyAssignment.id, vmRoleDefinitionId, subscription().id, 'WindowsVM')
+  name: guid(windowsVmPolicyAssignment.id, vmRoleDefinitionId, subscription().id, 'TestWindowsVM')
   properties: {
     principalId: windowsVmPolicyAssignment!.identity.principalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
@@ -885,7 +885,7 @@ resource windowsVmContributorRoleAssignment 'Microsoft.Authorization/roleAssignm
 }
 
 resource windowsVmssContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
-  name: guid(windowsVmssPolicyAssignment.id, vmRoleDefinitionId, subscription().id, 'WindowsVMSS')
+  name: guid(windowsVmssPolicyAssignment.id, vmRoleDefinitionId, subscription().id, 'TestWindowsVMSS')
   properties: {
     principalId: windowsVmssPolicyAssignment!.identity.principalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', vmRoleDefinitionId)
@@ -895,7 +895,7 @@ resource windowsVmssContributorRoleAssignment 'Microsoft.Authorization/roleAssig
 
 // Managed Identity Operator role assignments for VM policies (required for identity attachment)
 resource linuxVmMioRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && !empty(azureManagedIdentityResourceId) && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
-  name: guid(linuxVmPolicyAssignment.id, managedIdentityOperatorRoleId, subscription().id, 'LinuxVM-MIO')
+  name: guid(linuxVmPolicyAssignment.id, managedIdentityOperatorRoleId, subscription().id, 'TestLinuxVM-MIO')
   properties: {
     principalId: linuxVmPolicyAssignment!.identity.principalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', managedIdentityOperatorRoleId)
@@ -904,7 +904,7 @@ resource linuxVmMioRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-
 }
 
 resource windowsVmMioRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && !empty(azureManagedIdentityResourceId) && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
-  name: guid(windowsVmPolicyAssignment.id, managedIdentityOperatorRoleId, subscription().id, 'WindowsVM-MIO')
+  name: guid(windowsVmPolicyAssignment.id, managedIdentityOperatorRoleId, subscription().id, 'TestWindowsVM-MIO')
   properties: {
     principalId: windowsVmPolicyAssignment!.identity.principalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', managedIdentityOperatorRoleId)
@@ -913,7 +913,7 @@ resource windowsVmMioRoleAssignment 'Microsoft.Authorization/roleAssignments@202
 }
 
 resource linuxVmssMioRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && !empty(azureManagedIdentityResourceId) && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
-  name: guid(linuxVmssPolicyAssignment.id, managedIdentityOperatorRoleId, subscription().id, 'LinuxVMSS-MIO')
+  name: guid(linuxVmssPolicyAssignment.id, managedIdentityOperatorRoleId, subscription().id, 'TestLinuxVMSS-MIO')
   properties: {
     principalId: linuxVmssPolicyAssignment!.identity.principalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', managedIdentityOperatorRoleId)
@@ -922,7 +922,7 @@ resource linuxVmssMioRoleAssignment 'Microsoft.Authorization/roleAssignments@202
 }
 
 resource windowsVmssMioRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && !empty(azureManagedIdentityResourceId) && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
-  name: guid(windowsVmssPolicyAssignment.id, managedIdentityOperatorRoleId, subscription().id, 'WindowsVMSS-MIO')
+  name: guid(windowsVmssPolicyAssignment.id, managedIdentityOperatorRoleId, subscription().id, 'TestWindowsVMSS-MIO')
   properties: {
     principalId: windowsVmssPolicyAssignment!.identity.principalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', managedIdentityOperatorRoleId)
@@ -938,8 +938,8 @@ resource windowsVmssMioRoleAssignment 'Microsoft.Authorization/roleAssignments@2
 resource linuxArcPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (deployToArc && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
   name: '${linuxPolicyDefinitionName}-Arc'
   properties: {
-    displayName: 'Deploy CrowdStrike Falcon sensor on Linux Arc-connected servers'
-    description: 'This policy deploys CrowdStrike Falcon sensor on Linux Azure Arc-connected servers if not installed'
+    displayName: 'Test - Deploy CrowdStrike Falcon sensor on Linux Arc-connected servers'
+    description: 'Test policy - deploys CrowdStrike Falcon test extension on Linux Azure Arc-connected servers if not installed'
     policyType: 'Custom'
     mode: 'Indexed'
     metadata: policyMetadata
@@ -969,7 +969,7 @@ resource linuxArcPolicyDefinition 'Microsoft.Authorization/policyDefinitions@202
               }
               {
                 field: 'Microsoft.HybridCompute/machines/extensions/type'
-                equals: 'FalconSensorLinux'
+                equals: 'TestFalconSensorLinux'
               }
               {
                 field: 'Microsoft.HybridCompute/machines/extensions/provisioningState'
@@ -989,13 +989,13 @@ resource linuxArcPolicyDefinition 'Microsoft.Authorization/policyDefinitions@202
                 parameters: commonTemplateParameters
                 resources: [
                   {
-                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
+                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeTestFalconSensor\')]'
                     type: 'Microsoft.HybridCompute/machines/extensions'
                     location: '[parameters(\'location\')]'
                     apiVersion: '2024-07-10'
                     properties: {
                       publisher: 'Crowdstrike.Falcon'
-                      type: 'FalconSensorLinux'
+                      type: 'TestFalconSensorLinux'
                       typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
                       autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
                       settings: {
@@ -1031,8 +1031,8 @@ resource linuxArcPolicyDefinition 'Microsoft.Authorization/policyDefinitions@202
 resource windowsArcPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020-09-01' = if (deployToArc && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
   name: '${windowsPolicyDefinitionName}-Arc'
   properties: {
-    displayName: 'Deploy CrowdStrike Falcon sensor on Windows Arc-connected servers'
-    description: 'This policy deploys CrowdStrike Falcon sensor on Windows Azure Arc-connected servers if not installed'
+    displayName: 'Test - Deploy CrowdStrike Falcon sensor on Windows Arc-connected servers'
+    description: 'Test policy - deploys CrowdStrike Falcon test extension on Windows Azure Arc-connected servers if not installed'
     policyType: 'Custom'
     mode: 'Indexed'
     metadata: policyMetadata
@@ -1062,7 +1062,7 @@ resource windowsArcPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2
               }
               {
                 field: 'Microsoft.HybridCompute/machines/extensions/type'
-                equals: 'FalconSensorWindows'
+                equals: 'TestFalconSensorWindows'
               }
               {
                 field: 'Microsoft.HybridCompute/machines/extensions/provisioningState'
@@ -1082,13 +1082,13 @@ resource windowsArcPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2
                 parameters: windowsTemplateParameters
                 resources: [
                   {
-                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeFalconSensor\')]'
+                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeTestFalconSensor\')]'
                     type: 'Microsoft.HybridCompute/machines/extensions'
                     location: '[parameters(\'location\')]'
                     apiVersion: '2024-07-10'
                     properties: {
                       publisher: 'Crowdstrike.Falcon'
-                      type: 'FalconSensorWindows'
+                      type: 'TestFalconSensorWindows'
                       typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
                       autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
                       settings: {
@@ -1127,37 +1127,37 @@ resource windowsArcPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2
 
 // Create Linux Arc policy assignment at subscription level
 resource linuxArcPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (deployToArc && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
-  name: 'CS-Falcon-Linux-Arc-${take(subscription().subscriptionId, 8)}'
+  name: 'CS-Test-Linux-Arc-${take(subscription().subscriptionId, 8)}'
   location: deployment().location
   identity: {
     type: 'SystemAssigned'
   }
   properties: {
     policyDefinitionId: linuxArcPolicyDefinition.id
-    displayName: 'Deploy CrowdStrike Falcon sensor on Linux Arc-connected servers (Subscription)'
-    description: 'This policy ensures CrowdStrike Falcon sensor is installed on all Linux Arc-connected servers in the subscription'
+    displayName: 'Test - Deploy CrowdStrike Falcon sensor on Linux Arc-connected servers (Subscription)'
+    description: 'Test policy - ensures CrowdStrike Falcon test extension is installed on all Linux Arc-connected servers in the subscription'
     parameters: commonLinuxAssignmentParameters
   }
 }
 
 // Create Windows Arc policy assignment at subscription level
 resource windowsArcPolicyAssignment 'Microsoft.Authorization/policyAssignments@2020-09-01' = if (deployToArc && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
-  name: 'CS-Falcon-Windows-Arc-${take(subscription().subscriptionId, 8)}'
+  name: 'CS-Test-Windows-Arc-${take(subscription().subscriptionId, 8)}'
   location: deployment().location
   identity: {
     type: 'SystemAssigned'
   }
   properties: {
     policyDefinitionId: windowsArcPolicyDefinition.id
-    displayName: 'Deploy CrowdStrike Falcon sensor on Windows Arc-connected servers (Subscription)'
-    description: 'This policy ensures CrowdStrike Falcon sensor is installed on all Windows Arc-connected servers in the subscription'
+    displayName: 'Test - Deploy CrowdStrike Falcon sensor on Windows Arc-connected servers (Subscription)'
+    description: 'Test policy - ensures CrowdStrike Falcon test extension is installed on all Windows Arc-connected servers in the subscription'
     parameters: commonWindowsAssignmentParameters
   }
 }
 
 // Create role assignments for Arc policies' managed identities
 resource linuxArcRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && deployToArc && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) {
-  name: guid(linuxArcPolicyAssignment.id, arcRoleDefinitionId, subscription().id, 'LinuxArc')
+  name: guid(linuxArcPolicyAssignment.id, arcRoleDefinitionId, subscription().id, 'TestLinuxArc')
   properties: {
     principalId: linuxArcPolicyAssignment!.identity.principalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', arcRoleDefinitionId)
@@ -1166,7 +1166,7 @@ resource linuxArcRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04
 }
 
 resource windowsArcRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignments && deployToArc && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) {
-  name: guid(windowsArcPolicyAssignment.id, arcRoleDefinitionId, subscription().id, 'WindowsArc')
+  name: guid(windowsArcPolicyAssignment.id, arcRoleDefinitionId, subscription().id, 'TestWindowsArc')
   properties: {
     principalId: windowsArcPolicyAssignment!.identity.principalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', arcRoleDefinitionId)

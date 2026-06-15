@@ -37,7 +37,7 @@ EXAMPLES:
     $0 --test --publish -v 2.1.0       # Create both test and publish packages
 
 This script creates zip packages from the handler and package directories:
-    - Test mode: csfalcon-{platform}-handler-test-{version}.zip, csfalcon-deployment-test-{version}.zip
+    - Test mode: test{platform}extension-{version}.zip, csfalcon-deployment-test-{version}.zip
     - Publish mode: csfalcon-{platform}-handler-{version}.zip, csfalcon-{platform}-ui-{version}.zip, csfalcon-azure-policy-bicep.zip, csfalcon-deployment-{version}.zip
 EOF
 }
@@ -74,11 +74,12 @@ create_handler_package() {
     fi
     
     # Create zip file in output directory
-    local zip_suffix=""
+    local zip_name=""
     if [[ "${package_type}" == "test" ]]; then
-        zip_suffix="-test"
+        zip_name="test${platform}extension-${version}.zip"
+    else
+        zip_name="csfalcon-${platform}-handler-${version}.zip"
     fi
-    local zip_name="csfalcon-${platform}-handler${zip_suffix}-${version}.zip"
     local zip_path="${OUTPUT_DIR}/${zip_name}"
     
     echo "Generating ${zip_name}..."

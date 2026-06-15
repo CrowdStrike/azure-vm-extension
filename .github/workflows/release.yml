@@ -81,7 +81,11 @@ jobs:
         # Update ARM template handler versions
         sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "${{ steps.version.outputs.handler_version }}"/g' linux/package/Artifacts/MainTemplate.json
         sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "${{ steps.version.outputs.handler_version }}"/g' windows/package/Artifacts/MainTemplate.json
-        
+
+        # Update Arc ARM template handler versions
+        sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "${{ steps.version.outputs.handler_version }}"/g' linux/package/Artifacts/MainTemplate-Arc.json
+        sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "${{ steps.version.outputs.handler_version }}"/g' windows/package/Artifacts/MainTemplate-Arc.json
+
         echo "Updated all version references"
 
     - name: Generate deployment files

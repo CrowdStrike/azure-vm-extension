@@ -8,6 +8,7 @@ set -euo pipefail
 # Default values
 TEST_MODE=false
 PUBLISH_MODE=false
+INTERNAL=false
 PLATFORM="all"
 VERSION=""
 REGIONS=""
@@ -24,7 +25,8 @@ Generate CrowdStrike Azure VM Extension deployment JSON files
 FLAGS:
     --test                              Generate test deployment files
     --publish                           Generate publish deployment files
-    
+    --internal                          Mark extension as internal (default: false)
+
 OPTIONS:
     -p, --platform <linux|windows|all> Platform (default: all)
     -v, --version <version>             Version number (required)
@@ -55,6 +57,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --publish)
             PUBLISH_MODE=true
+            shift
+            ;;
+        --internal)
+            INTERNAL=true
             shift
             ;;
         -p|--platform)
@@ -189,15 +195,20 @@ generate_deployment() {
     local supported_os=""
     local internal_extension=""
     
-    # Set internal extension flag based on environment
-    if [[ "$env" == "test" ]]; then
-        regions='["Central US EUAP"]'
+    # Set internal extension flag
+    if [[ "$INTERNAL" == true ]]; then
         internal_extension="true"
+    else
+        internal_extension="false"
+    fi
+
+    # Set regions based on environment
+    if [[ "$env" == "test" ]]; then
+        regions='["Central US EUAP", "East US 2 EUAP"]'
     else
         # For publish mode, use provided regions or default
         local default_array='["*"]'
         regions=$(format_regions "$REGIONS" "$default_array")
-        internal_extension="false"
     fi
     
     if [[ "$platform" == "linux" ]]; then
