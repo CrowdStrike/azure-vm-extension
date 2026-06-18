@@ -38,7 +38,7 @@ EXAMPLES:
 
 This script creates zip packages from the handler and package directories:
     - Test mode: test{platform}extension-{version}.zip, csfalcon-deployment-test-{version}.zip
-    - Publish mode: csfalcon-{platform}-handler-{version}.zip, csfalcon-{platform}-ui-{version}.zip, csfalcon-azure-policy-bicep.zip, csfalcon-deployment-{version}.zip
+    - Publish mode: csfalcon-{platform}-handler-{version}.zip, csfalcon-{platform}-ui-{version}.zip, csfalcon-{platform}-arc-ui-{version}.zip, csfalcon-azure-policy-bicep.zip, csfalcon-deployment-{version}.zip
 EOF
 }
 
@@ -101,43 +101,58 @@ create_handler_package() {
     return 0
 }
 
-# Function to create UI package
+# Function to create a UI package for a single marketplace variant.
+#
+# Each variant is a fully self-contained, marketplace-ready directory using the
+# canonical filenames (Manifest.json, UiDefinition.json,
+# Artifacts/MainTemplate.json, Artifacts/CreateUiDefinition.json, Strings/,
+# Icons/). The whole directory is zipped as-is.
+#
+#   variant "vm":  {platform}/package
+#   variant "arc": {platform}/package-arc
 create_ui_package() {
     local platform=$1
     local package_type=$2  # "test" or "publish"
     local version=$3
-    
+    local variant=$4       # "vm" or "arc"
+
     local platform_dir="${PROJECT_ROOT}/${platform}"
-    local package_dir="${platform_dir}/package"
-    
+    local package_dir zip_infix
+    if [[ "${variant}" == "arc" ]]; then
+        package_dir="${platform_dir}/package-arc"
+        zip_infix="-arc"
+    else
+        package_dir="${platform_dir}/package"
+        zip_infix=""
+    fi
+
     if [[ ! -d "${package_dir}" ]]; then
         echo "Error: Package directory not found: ${package_dir}"
         return 1
     fi
-    
-    # Create zip file in output directory
+
     local zip_suffix=""
     if [[ "${package_type}" == "test" ]]; then
         zip_suffix="-test"
     fi
-    local zip_name="csfalcon-${platform}-ui${zip_suffix}-${version}.zip"
+    local zip_name="csfalcon-${platform}${zip_infix}-ui${zip_suffix}-${version}.zip"
     local zip_path="${OUTPUT_DIR}/${zip_name}"
-    
+
     echo "Generating ${zip_name}..."
-    
+
     cd "${package_dir}" || {
         echo "Error: Failed to change to package directory: ${package_dir}"
         return 1
     }
-    
+
     if ! zip -r "${zip_path}" . -q; then
         echo "Error: Failed to create zip file: ${zip_path}"
         cd "${PROJECT_ROOT}"
         return 1
     fi
-    
+
     cd "${PROJECT_ROOT}"
-    
+
     echo "✓ Created ${zip_name}"
     return 0
 }
@@ -261,11 +276,13 @@ create_platform_packages() {
             success=false
         fi
         
-        # Only create UI package for publish mode
+        # Only create UI packages for publish mode (VM and Arc variants)
         if [[ "${package_type}" == "publish" ]]; then
-            if ! create_ui_package "${platform}" "${package_type}" "${version}"; then
-                success=false
-            fi
+            for variant in vm arc; do
+                if ! create_ui_package "${platform}" "${package_type}" "${version}" "${variant}"; then
+                    success=false
+                fi
+            done
         fi
     done
     

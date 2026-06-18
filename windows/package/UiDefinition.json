@@ -2,8 +2,8 @@
   "$schema": "https://gallery.azure.com/schemas/2018-02-12/UIDefinition.json#",
   "createDefinition": {
     "createBlade": {
-      "name": "CreateUIDefinitionBlade",
-      "extension": "Microsoft_Azure_CreateUIDef"
+      "name": "AddVmExtension",
+      "extension": "Microsoft_Azure_Compute"
     }
   }
 }

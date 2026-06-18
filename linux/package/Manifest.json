@@ -20,12 +20,6 @@
       "isDefault": true
     },
     {
-      "name": "MainTemplate-Arc",
-      "type": "Template",
-      "path": "Artifacts\\MainTemplate-Arc.json",
-      "isDefault": false
-    },
-    {
       "name": "CreateUiDefinition",
       "type": "Custom",
       "path": "Artifacts\\CreateUiDefinition.json",
@@ -46,7 +40,6 @@
     }
   ],
   "categories": [
-    "compute-vmextension-linux",
-    "hybridcompute-extension-linux"
+    "compute-vmextension-linux"
   ]
 }
