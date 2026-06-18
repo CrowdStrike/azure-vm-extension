@@ -1,6 +1,6 @@
 {
   "$schema": "https://gallery.azure.com/schemas/2015-04-01/manifest.json#",
-  "name": "FalconSensor-windows-arm",
+  "name": "FalconSensor-linux-arc-arm",
   "publisher": "CrowdStrike",
   "version": "0.0.1",
   "displayName": "ms-resource:displayName",
@@ -40,6 +40,6 @@
     }
   ],
   "categories": [
-    "compute-vmextension-windows"
+    "hybridcompute-extension-linux"
   ]
 }

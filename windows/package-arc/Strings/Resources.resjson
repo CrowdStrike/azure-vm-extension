@@ -1,0 +1,8 @@
+{
+  "displayName": "CrowdStrike Falcon Windows Extension for Azure Arc",
+  "publisherDisplayName": "CrowdStrike",
+  "summary": "Automate CrowdStrike Falcon sensor deployment across your Azure Arc-enabled Windows servers",
+  "description": "<p>Easily deploy CrowdStrike Falcon® to your Azure Arc-enabled Windows servers running on-premises, at the edge, or in other clouds.</p><p>Use a policy-driven approach to ensure your hybrid and multicloud workloads get protected from the moment they connect to Azure Arc, allowing you to stay compliant and ahead of the adversary.</p> See <a target=\"_blank\" href=\"https://github.com/crowdstrike/azure-vm-extension\">https://github.com/crowdstrike/azure-vm-extension</a> for more information.</p>",
+  "link1": "CrowdStrike"
+}
+

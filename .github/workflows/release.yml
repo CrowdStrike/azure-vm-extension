@@ -73,6 +73,10 @@ jobs:
         # Update package manifest versions
         sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.full_version }}"/g' linux/package/Manifest.json
         sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.full_version }}"/g' windows/package/Manifest.json
+
+        # Update Arc package manifest versions
+        sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.full_version }}"/g' linux/package-arc/Manifest.json
+        sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.full_version }}"/g' windows/package-arc/Manifest.json
         
         # Update bicep handler versions (nested inside extensionSettings object)
         sed -i "s/handlerVersion: '[^']*'/handlerVersion: '${{ steps.version.outputs.handler_version }}'/g" policy/falcon-subscription.bicep
@@ -83,8 +87,8 @@ jobs:
         sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "${{ steps.version.outputs.handler_version }}"/g' windows/package/Artifacts/MainTemplate.json
 
         # Update Arc ARM template handler versions
-        sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "${{ steps.version.outputs.handler_version }}"/g' linux/package/Artifacts/MainTemplate-Arc.json
-        sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "${{ steps.version.outputs.handler_version }}"/g' windows/package/Artifacts/MainTemplate-Arc.json
+        sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "${{ steps.version.outputs.handler_version }}"/g' linux/package-arc/Artifacts/MainTemplate.json
+        sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "${{ steps.version.outputs.handler_version }}"/g' windows/package-arc/Artifacts/MainTemplate.json
 
         echo "Updated all version references"
 
@@ -105,8 +109,10 @@ jobs:
         gh release upload ${{ github.event.release.tag_name }} \
           dist/csfalcon-linux-handler-${{ steps.version.outputs.full_version }}.zip \
           dist/csfalcon-linux-ui-${{ steps.version.outputs.full_version }}.zip \
+          dist/csfalcon-linux-arc-ui-${{ steps.version.outputs.full_version }}.zip \
           dist/csfalcon-windows-handler-${{ steps.version.outputs.full_version }}.zip \
           dist/csfalcon-windows-ui-${{ steps.version.outputs.full_version }}.zip \
+          dist/csfalcon-windows-arc-ui-${{ steps.version.outputs.full_version }}.zip \
           dist/csfalcon-azure-policy-bicep.zip \
           dist/csfalcon-publish-extension-${{ steps.version.outputs.full_version }}.zip
       env:
