@@ -146,6 +146,10 @@
                 {
                   "label": "EU-1",
                   "value": "eu-1"
+                },
+                {
+                  "label": "US-3",
+                  "value": "us-3"
                 }
               ],
               "required": true

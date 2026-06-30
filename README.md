@@ -119,7 +119,7 @@ These configuration parameters can be placed in the `settings` section:
 |-----------|-------------|---------|
 | `azure_vault_name` | Azure Key Vault name containing CrowdStrike credentials | None |
 | `azure_managed_identity_client_id` | Azure Managed Identity Client ID for Key Vault access (used with azure_vault_name) | None |
-| `cloud` | CrowdStrike cloud region (us-1, us-2, eu-1, us-gov-1, autodiscover) | autodiscover |
+| `cloud` | CrowdStrike cloud region (e.g. us-1, us-2, eu-1, us-gov-1, autodiscover) | autodiscover |
 | `member_cid` | Member CID for MSSP Parent/child scenarios. Requires Parent API Credentials and the Child CID. | None |
 | `sensor_update_policy` | Sensor update policy name. Configure this to match your organization's desired sensor update policy instead of using the pre-defined default. | platform_default |
 | `tags` | Comma-separated list of sensor tags | None |
