@@ -250,7 +250,7 @@ See https://github.com/CrowdStrike/azure-vm-extension?tab=readme-ov-file#falcon-
 | `azureVaultName` | string | Azure Key Vault name containing CrowdStrike credentials | '' |
 | `azureManagedIdentityClientId` | string | Azure Managed Identity Client ID for Key Vault access (required when `azureManagedIdentityResourceId` is set) | '' |
 | `azureManagedIdentityResourceId` | string | Full ARM resource ID of the user-assigned managed identity to attach to VMs/VMSS for Key Vault access (requires `azureManagedIdentityClientId`) | '' |
-| `cloud` | string | Falcon Cloud (us-1, us-2, eu-1, us-gov-1) | 'autodiscover' |
+| `cloud` | string | Falcon Cloud (e.g. us-1, us-2, eu-1, us-gov-1) | 'autodiscover' |
 | `memberCid` | string | Member CID for MSSP. Requires Parent API Credentials and the Child CID for memberCid.| '' |
 | `sensorUpdatePolicy` | string | Sensor update policy name. Configure this to match your organization's desired sensor update policy instead of using the pre-defined default. | 'platform_default' |
 | `tags` | string | Comma-separated sensor tags | '' |
