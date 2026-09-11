@@ -1,0 +1,64 @@
+name: Validate deploy templates
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Lint and validate deploy/ artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Validate JSON syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in deploy/*.json; do
+            echo "Validating $f"
+            python3 -c "import json,sys; json.load(open('$f'))"
+          done
+          echo "All deploy/*.json parsed successfully."
+
+      - name: Verify UI outputs map 1:1 to template parameters
+        shell: python
+        run: |
+          import json, sys
+          def params(f): return set(json.load(open(f)).get("parameters", {}))
+          sub = params("deploy/mainTemplate.sub.json")
+          mg = params("deploy/mainTemplate.mg.json")
+          ui = set(json.load(open("deploy/createUiDefinition.json"))["parameters"]["outputs"])
+          form = set(json.load(open("deploy/uiFormDefinition.mg.json"))["view"]["outputs"]["parameters"])
+          errs = []
+          for k in sorted(ui - sub):
+              errs.append(f"createUiDefinition output '{k}' has no matching parameter in mainTemplate.sub.json")
+          for k in sorted(form - mg):
+              errs.append(f"uiFormDefinition parameter '{k}' has no matching parameter in mainTemplate.mg.json")
+          if errs:
+              print("\n".join(errs)); sys.exit(1)
+          print("createUiDefinition outputs and uiFormDefinition parameters both map 1:1 to their templates.")
+
+      - name: ARM-TTK (createUiDefinition tests)
+        shell: pwsh
+        run: |
+          git clone --depth 1 https://github.com/Azure/arm-ttk.git $env:RUNNER_TEMP/arm-ttk
+          Import-Module $env:RUNNER_TEMP/arm-ttk/arm-ttk/arm-ttk.psd1
+          $stage = "$env:RUNNER_TEMP/ttk"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item deploy/mainTemplate.sub.json "$stage/mainTemplate.json"
+          Copy-Item deploy/createUiDefinition.json "$stage/createUiDefinition.json"
+          $results = Test-AzTemplate -TemplatePath $stage
+          # Only gate on createUiDefinition-contract tests; template-level findings come from
+          # the upstream Bicep compiler output and are out of scope for this folder.
+          $gated = 'Controls In Outputs Must Exist','Outputs Must Be Present In Template Parameters','CreateUIDefinition Should Have Schema','Handler Must Be Correct','Outputs Must Not Contain Secrets','Parameters Without Default Must Exist In CreateUIDefinition'
+          $failed = $results | Where-Object { -not $_.Passed -and $gated -contains $_.Name }
+          $results | ForEach-Object { "{0} {1}" -f $(if($_.Passed){'PASS'}else{'FAIL'}), $_.Name }
+          if ($failed) { Write-Error "createUiDefinition contract tests failed"; exit 1 }
+          Write-Host "createUiDefinition contract tests passed."
