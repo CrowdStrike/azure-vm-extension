@@ -20,9 +20,14 @@ jobs:
       id: version
       run: |
         # Extract version from tag (remove 'v' prefix if present)
-        VERSION="${{ github.event.release.tag_name }}"
-        VERSION="${VERSION#v}"  # Remove 'v' prefix if present
-        
+        VERSION="${RELEASE_TAG#v}"
+
+        # Only accept plain semantic versions; the tag is user-controlled and feeds later steps
+        if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::Release tag must be a semantic version like v1.2.3, got: '$RELEASE_TAG'"
+          exit 1
+        fi
+
         # Split version into components for handler version (major.minor)
         IFS='.' read -ra VERSION_PARTS <<< "$VERSION"
         HANDLER_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}"
@@ -32,88 +37,109 @@ jobs:
         
         echo "Full Version: $VERSION"
         echo "Handler Version: $HANDLER_VERSION"
+      env:
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
 
-    - name: Download latest falcon-installer binaries
+    - name: Download and verify latest falcon-installer binaries
       run: |
-        echo "Downloading latest falcon-installer binaries from github.com/crowdstrike/falcon-installer..."
-        
-        # Get the latest release info to determine version for filename
-        LATEST_RELEASE=$(curl -s https://api.github.com/repos/crowdstrike/falcon-installer/releases/latest)
-        FALCON_VERSION=$(echo $LATEST_RELEASE | jq -r '.tag_name' | sed 's/^v//')
-        echo "Latest falcon-installer release: v$FALCON_VERSION"
-        
-        # Download Linux binaries using the versioned filename format
-        echo "Downloading Linux falcon-installer binaries..."
-        curl --silent -L -o linux/handler/falcon-installer-x86_64 \
-          "https://github.com/CrowdStrike/falcon-installer/releases/latest/download/falcon-installer-${FALCON_VERSION}-linux-x86_64"
-        curl --silent -L -o linux/handler/falcon-installer-arm64 \
-          "https://github.com/CrowdStrike/falcon-installer/releases/latest/download/falcon-installer-${FALCON_VERSION}-linux-arm64"
-        
-        # Download Windows binaries using the versioned filename format
-        echo "Downloading Windows falcon-installer binaries..."
-        curl --silent -L -o windows/handler/falcon-installer-x86_64.exe \
-          "https://github.com/CrowdStrike/falcon-installer/releases/latest/download/falcon-installer-${FALCON_VERSION}-windows-x86_64.exe"
-        curl --silent -L -o windows/handler/falcon-installer-arm64.exe \
-          "https://github.com/CrowdStrike/falcon-installer/releases/latest/download/falcon-installer-${FALCON_VERSION}-windows-arm64.exe"
-        
-        # Make Linux binaries executable
-        chmod +x linux/handler/falcon-installer-x86_64
-        chmod +x linux/handler/falcon-installer-arm64
-        chmod +x windows/handler/falcon-installer-x86_64.exe
-        chmod +x windows/handler/falcon-installer-arm64.exe
-        
-        echo "Successfully downloaded falcon-installer binaries"
+        # Always bundle the latest falcon-installer release (intentional). The tag is resolved once and
+        # every download uses that tag's URL so all assets come from the same release.
+        FALCON_TAG=$(gh api repos/crowdstrike/falcon-installer/releases/latest --jq '.tag_name')
+        if [[ ! "$FALCON_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::Unexpected falcon-installer release tag: '$FALCON_TAG'"
+          exit 1
+        fi
+        FALCON_VERSION="${FALCON_TAG#v}"
+        BASE_URL="https://github.com/CrowdStrike/falcon-installer/releases/download/${FALCON_TAG}"
+        DOWNLOAD_DIR=$(mktemp -d)
+        echo "Latest falcon-installer release: $FALCON_TAG"
+
+        curl --fail --silent --show-error -L -o "$DOWNLOAD_DIR/checksums.txt" "$BASE_URL/checksums.txt"
+
+        # Each target is <os>-<arch>[.exe], e.g. linux-x86_64 -> linux/handler/falcon-installer-x86_64
+        for target in linux-x86_64 linux-arm64 windows-x86_64.exe windows-arm64.exe; do
+          asset="falcon-installer-${FALCON_VERSION}-${target}"
+          dest="${target%%-*}/handler/falcon-installer-${target#*-}"
+
+          echo "Downloading $asset..."
+          curl --fail --silent --show-error -L -o "$DOWNLOAD_DIR/$asset" "$BASE_URL/$asset"
+
+          # Verify against the release's published checksum before it can be packaged
+          expected=$(awk -v name="$asset" '$2 == name { print $1 }' "$DOWNLOAD_DIR/checksums.txt")
+          actual=$(sha256sum "$DOWNLOAD_DIR/$asset" | awk '{ print $1 }')
+          if [[ -z "$expected" || "$expected" != "$actual" ]]; then
+            echo "::error::Checksum verification failed for $asset (expected '$expected', got '$actual')"
+            exit 1
+          fi
+          echo "Verified $asset ($actual)"
+
+          mv "$DOWNLOAD_DIR/$asset" "$dest"
+          chmod +x "$dest"
+        done
+
+        echo "Successfully downloaded and verified falcon-installer binaries"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Update all version references
       run: |
         # Update handler script versions
-        sed -i 's/readonly VERSION="[^"]*"/readonly VERSION="${{ steps.version.outputs.full_version }}"/g' linux/handler/helper.sh
-        sed -i 's/\$VERSION = "[^"]*"/\$VERSION = "${{ steps.version.outputs.full_version }}"/g' windows/handler/helper.ps1
-        
+        sed -i 's/readonly VERSION="[^"]*"/readonly VERSION="'"$FULL_VERSION"'"/g' linux/handler/helper.sh
+        sed -i 's/\$VERSION = "[^"]*"/\$VERSION = "'"$FULL_VERSION"'"/g' windows/handler/helper.ps1
+
         # Update package manifest versions
-        sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.full_version }}"/g' linux/package/Manifest.json
-        sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.full_version }}"/g' windows/package/Manifest.json
+        sed -i 's/"version": "[^"]*"/"version": "'"$FULL_VERSION"'"/g' linux/package/Manifest.json
+        sed -i 's/"version": "[^"]*"/"version": "'"$FULL_VERSION"'"/g' windows/package/Manifest.json
 
         # Update Arc package manifest versions
-        sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.full_version }}"/g' linux/package-arc/Manifest.json
-        sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.full_version }}"/g' windows/package-arc/Manifest.json
-        
+        sed -i 's/"version": "[^"]*"/"version": "'"$FULL_VERSION"'"/g' linux/package-arc/Manifest.json
+        sed -i 's/"version": "[^"]*"/"version": "'"$FULL_VERSION"'"/g' windows/package-arc/Manifest.json
+
         # Update bicep handler versions (nested inside extensionSettings object)
-        sed -i "s/handlerVersion: '[^']*'/handlerVersion: '${{ steps.version.outputs.handler_version }}'/g" policy/falcon-subscription.bicep
-        sed -i "s/handlerVersion: '[^']*'/handlerVersion: '${{ steps.version.outputs.handler_version }}'/g" policy/falcon-managementgroup.bicep
-        
+        sed -i "s/handlerVersion: '[^']*'/handlerVersion: '${HANDLER_VERSION}'/g" policy/falcon-subscription.bicep
+        sed -i "s/handlerVersion: '[^']*'/handlerVersion: '${HANDLER_VERSION}'/g" policy/falcon-managementgroup.bicep
+
         # Update ARM template handler versions
-        sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "${{ steps.version.outputs.handler_version }}"/g' linux/package/Artifacts/MainTemplate.json
-        sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "${{ steps.version.outputs.handler_version }}"/g' windows/package/Artifacts/MainTemplate.json
+        sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "'"$HANDLER_VERSION"'"/g' linux/package/Artifacts/MainTemplate.json
+        sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "'"$HANDLER_VERSION"'"/g' windows/package/Artifacts/MainTemplate.json
 
         # Update Arc ARM template handler versions
-        sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "${{ steps.version.outputs.handler_version }}"/g' linux/package-arc/Artifacts/MainTemplate.json
-        sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "${{ steps.version.outputs.handler_version }}"/g' windows/package-arc/Artifacts/MainTemplate.json
+        sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "'"$HANDLER_VERSION"'"/g' linux/package-arc/Artifacts/MainTemplate.json
+        sed -i 's/"extensionTypeHandlerVersion": "[^"]*"/"extensionTypeHandlerVersion": "'"$HANDLER_VERSION"'"/g' windows/package-arc/Artifacts/MainTemplate.json
 
         echo "Updated all version references"
+      env:
+        FULL_VERSION: ${{ steps.version.outputs.full_version }}
+        HANDLER_VERSION: ${{ steps.version.outputs.handler_version }}
 
     - name: Generate deployment files
       run: |
         # Generate deployment JSON files for publishing the extension
-        ./scripts/generate-deployment.sh --publish --version ${{ steps.version.outputs.full_version }} --platform all --template-file scripts/deploy.json.template --output-dir .
+        ./scripts/generate-deployment.sh --publish --version "$FULL_VERSION" --platform all --template-file scripts/deploy.json.template --output-dir .
+      env:
+        FULL_VERSION: ${{ steps.version.outputs.full_version }}
 
     - name: Create release packages
       run: |
         mkdir -p dist
-        
+
         # Use generate-zip script for all packages (handler, UI, policy, and deployment)
-        ./scripts/generate-zip.sh --publish --version ${{ steps.version.outputs.full_version }} --output-dir dist
-        
+        ./scripts/generate-zip.sh --publish --version "$FULL_VERSION" --output-dir dist
+      env:
+        FULL_VERSION: ${{ steps.version.outputs.full_version }}
+
     - name: Upload packages to release
       run: |
-        gh release upload ${{ github.event.release.tag_name }} \
-          dist/csfalcon-linux-handler-${{ steps.version.outputs.full_version }}.zip \
-          dist/csfalcon-linux-ui-${{ steps.version.outputs.full_version }}.zip \
-          dist/csfalcon-linux-arc-ui-${{ steps.version.outputs.full_version }}.zip \
-          dist/csfalcon-windows-handler-${{ steps.version.outputs.full_version }}.zip \
-          dist/csfalcon-windows-ui-${{ steps.version.outputs.full_version }}.zip \
-          dist/csfalcon-windows-arc-ui-${{ steps.version.outputs.full_version }}.zip \
+        gh release upload "$RELEASE_TAG" \
+          "dist/csfalcon-linux-handler-${FULL_VERSION}.zip" \
+          "dist/csfalcon-linux-ui-${FULL_VERSION}.zip" \
+          "dist/csfalcon-linux-arc-ui-${FULL_VERSION}.zip" \
+          "dist/csfalcon-windows-handler-${FULL_VERSION}.zip" \
+          "dist/csfalcon-windows-ui-${FULL_VERSION}.zip" \
+          "dist/csfalcon-windows-arc-ui-${FULL_VERSION}.zip" \
           dist/csfalcon-azure-policy-bicep.zip \
-          dist/csfalcon-publish-extension-${{ steps.version.outputs.full_version }}.zip
+          "dist/csfalcon-publish-extension-${FULL_VERSION}.zip"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
+        FULL_VERSION: ${{ steps.version.outputs.full_version }}
