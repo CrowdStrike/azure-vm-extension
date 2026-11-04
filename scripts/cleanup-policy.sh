@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 # Cleanup script for CrowdStrike Falcon Azure Policy resources
-# Dynamically discovers and removes policy assignments, definitions, and deployments
-# at both subscription and management group scope.
+# Dynamically discovers and removes policy assignments (and the role assignments of their
+# managed identities), definitions, and deployments at both subscription and management group scope.
 
 set -euo pipefail
 
@@ -46,7 +46,8 @@ Usage: $0 [OPTIONS]
 Remove CrowdStrike Falcon Azure Policy assignments, definitions, and deployments.
 
 Resources are discovered dynamically using the policy name prefix (default: CS-Falcon).
-Deletion order: assignments → definitions → deployments (respects dependency ordering).
+Deletion order: role assignments of each assignment's managed identity → assignments →
+definitions → deployments (respects dependency ordering).
 
 SCOPE OPTIONS:
   --scope SCOPE             Target scope: subscription, management-group, or both
@@ -160,6 +161,50 @@ check_prerequisites() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Role assignment cleanup
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Role assignments are named deterministically from the policy assignment, so any left behind
+# for a deleted assignment's managed identity block the next deployment with
+# RoleAssignmentUpdateNotPermitted. Must run before the assignment is deleted.
+delete_identity_role_assignments() {
+    local assignment_name=$1
+    local assignment_scope=$2
+
+    local principal_id
+    principal_id=$(az policy assignment show \
+        --name "$assignment_name" \
+        --scope "$assignment_scope" \
+        --query "identity.principalId" \
+        --output tsv 2>/dev/null) || true
+
+    if [[ -z "$principal_id" ]]; then
+        return 0
+    fi
+
+    # Filtering by principalId returns role assignments at, above, and below the scope,
+    # which includes the Key Vault grant created for Key Vault references
+    local role_assignments
+    role_assignments=$(az rest --method get \
+        --url "https://management.azure.com${assignment_scope}/providers/Microsoft.Authorization/roleAssignments?api-version=2022-04-01&\$filter=principalId%20eq%20'${principal_id}'" \
+        --query "value[].id" \
+        --output tsv 2>/dev/null) || true
+
+    while IFS= read -r id; do
+        [[ -z "$id" ]] && continue
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log INFO "[DRY RUN] Would delete role assignment: $id"
+        else
+            if az role assignment delete --ids "$id" --output none 2>/dev/null; then
+                log SUCCESS "Deleted role assignment: $id"
+            else
+                log WARNING "Failed to delete role assignment: $id"
+            fi
+        fi
+    done <<< "$role_assignments"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Subscription-scoped cleanup
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -192,7 +237,8 @@ delete_subscription_assignments() {
     local count=0
     while IFS= read -r name; do
         [[ -z "$name" ]] && continue
-        ((count++))
+        ((count++)) || true
+        delete_identity_role_assignments "$name" "/subscriptions/${SUBSCRIPTION_ID}"
         if [[ "$DRY_RUN" == "true" ]]; then
             log INFO "[DRY RUN] Would delete policy assignment: $name"
         else
@@ -224,7 +270,7 @@ delete_subscription_definitions() {
     local count=0
     while IFS= read -r name; do
         [[ -z "$name" ]] && continue
-        ((count++))
+        ((count++)) || true
         if [[ "$DRY_RUN" == "true" ]]; then
             log INFO "[DRY RUN] Would delete policy definition: $name"
         else
@@ -260,7 +306,7 @@ delete_subscription_deployments() {
     local count=0
     while IFS= read -r name; do
         [[ -z "$name" ]] && continue
-        ((count++))
+        ((count++)) || true
         if [[ "$DRY_RUN" == "true" ]]; then
             log INFO "[DRY RUN] Would delete subscription deployment: $name"
         else
@@ -320,7 +366,8 @@ delete_management_group_assignments() {
     local count=0
     while IFS= read -r name; do
         [[ -z "$name" ]] && continue
-        ((count++))
+        ((count++)) || true
+        delete_identity_role_assignments "$name" "$mg_scope"
         if [[ "$DRY_RUN" == "true" ]]; then
             log INFO "[DRY RUN] Would delete management group policy assignment: $name"
         else
@@ -356,7 +403,7 @@ delete_management_group_definitions() {
     local count=0
     while IFS= read -r name; do
         [[ -z "$name" ]] && continue
-        ((count++))
+        ((count++)) || true
         if [[ "$DRY_RUN" == "true" ]]; then
             log INFO "[DRY RUN] Would delete management group policy definition: $name"
         else
@@ -396,7 +443,7 @@ delete_management_group_deployments() {
     local count=0
     while IFS= read -r name; do
         [[ -z "$name" ]] && continue
-        ((count++))
+        ((count++)) || true
         if [[ "$DRY_RUN" == "true" ]]; then
             log INFO "[DRY RUN] Would delete management group deployment: $name"
         else
