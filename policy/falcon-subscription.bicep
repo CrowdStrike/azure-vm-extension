@@ -32,22 +32,24 @@ param extensionSettings object = {
 }
 
 // CrowdStrike Parameters
-@secure()
-param clientId string = ''
-@secure()
-param clientSecret string = ''
-@secure()
-param accessToken string = ''
 param azureVaultName string = ''
 param cloud string = 'autodiscover'
 param memberCid string = ''
 param sensorUpdatePolicy string = 'platform_default'
 param disableProxy bool = false
-@secure()
-param provisioningToken string = ''
 param azureManagedIdentityClientId string = ''
 @description('Full ARM resource ID of the user-assigned managed identity to attach to VMs for Key Vault access')
 param azureManagedIdentityResourceId string = ''
+@description('Resource ID of a Key Vault to read CrowdStrike credentials from during policy remediation. Use azureVaultName instead to have the extension read the vault on each machine')
+param keyVaultResourceId string = ''
+@description('Key Vault secret name for the CrowdStrike API Client ID (requires keyVaultResourceId)')
+param clientIdSecretName string = 'FALCON-CLIENT-ID'
+@description('Key Vault secret name for the CrowdStrike API Client Secret (requires keyVaultResourceId)')
+param clientSecretSecretName string = 'FALCON-CLIENT-SECRET'
+@description('Key Vault secret name for a CrowdStrike API Access Token. When set, it is used instead of the Client ID and Secret (requires keyVaultResourceId)')
+param accessTokenSecretName string = ''
+@description('Key Vault secret name for the CrowdStrike Provisioning Token (requires keyVaultResourceId)')
+param provisioningTokenSecretName string = ''
 param proxySettings object = {
   proxyHost: ''
   proxyPort: ''
@@ -67,6 +69,16 @@ var managedIdentityOperatorRoleId = 'f1a07417-d97a-45cb-824c-7a7467783830' // Ma
 var linuxPolicyDefinitionName = '${policyDefinitionNamePrefix}-Linux'
 var windowsPolicyDefinitionName = '${policyDefinitionNamePrefix}-Windows'
 
+// Credentials are resolved by ARM from keyVaultResourceId during remediation, so they are never
+// stored on the policy assignment. An access token takes precedence over the Client ID and Secret.
+var useKeyVaultReferences = !empty(keyVaultResourceId)
+var accessTokenFromKeyVault = useKeyVaultReferences && !empty(accessTokenSecretName)
+var clientIdFromKeyVault = useKeyVaultReferences && !accessTokenFromKeyVault && !empty(clientIdSecretName)
+var clientSecretFromKeyVault = useKeyVaultReferences && !accessTokenFromKeyVault && !empty(clientSecretSecretName)
+var provisioningTokenFromKeyVault = useKeyVaultReferences && !empty(provisioningTokenSecretName)
+// Placeholder keeps the index lookups valid when Key Vault references are not used
+var keyVaultIdParts = split(useKeyVaultReferences ? keyVaultResourceId : '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/unused/providers/Microsoft.KeyVault/vaults/unused', '/')
+
 var policyMetadata = {
   category: 'Security'
   version: '1.0.0'
@@ -85,27 +97,6 @@ var commonParameters = {
       'Disabled'
     ]
     defaultValue: 'DeployIfNotExists'
-  }
-  clientId: {
-    type: 'String'
-    metadata: {
-      displayName: 'CrowdStrike Client ID'
-      description: 'CrowdStrike API Client ID'
-    }
-  }
-  clientSecret: {
-    type: 'String'
-    metadata: {
-      displayName: 'CrowdStrike Client Secret'
-      description: 'CrowdStrike API Client Secret'
-    }
-  }
-  accessToken: {
-    type: 'String'
-    metadata: {
-      displayName: 'CrowdStrike Access Token'
-      description: 'CrowdStrike API Access Token'
-    }
   }
   azureVaultName: {
     type: 'String'
@@ -162,14 +153,6 @@ var commonParameters = {
       description: 'Disable proxy settings'
     }
     defaultValue: false
-  }
-  provisioningToken: {
-    type: 'String'
-    metadata: {
-      displayName: 'Provisioning Token'
-      description: 'CrowdStrike Provisioning Token'
-    }
-    defaultValue: ''
   }
   proxySettings: {
     type: 'Object'
@@ -273,12 +256,18 @@ var windowsTemplateParameters = union(commonTemplateParameters, {
   vdi: { type: 'bool' }
 })
 
+var keyVaultReferenceId = { id: keyVaultResourceId }
+var clientIdKeyVaultReference = { reference: { keyVault: keyVaultReferenceId, secretName: clientIdSecretName } }
+var clientSecretKeyVaultReference = { reference: { keyVault: keyVaultReferenceId, secretName: clientSecretSecretName } }
+var accessTokenKeyVaultReference = { reference: { keyVault: keyVaultReferenceId, secretName: accessTokenSecretName } }
+var provisioningTokenKeyVaultReference = { reference: { keyVault: keyVaultReferenceId, secretName: provisioningTokenSecretName } }
+
 var commonTemplateParameterValues = {
   resourceName: { value: '[field(\'name\')]' }
   location: { value: '[field(\'location\')]' }
-  clientId: { value: '[parameters(\'clientId\')]' }
-  clientSecret: { value: '[parameters(\'clientSecret\')]' }
-  accessToken: { value: '[parameters(\'accessToken\')]' }
+  clientId: clientIdFromKeyVault ? clientIdKeyVaultReference : { value: '' }
+  clientSecret: clientSecretFromKeyVault ? clientSecretKeyVaultReference : { value: '' }
+  accessToken: accessTokenFromKeyVault ? accessTokenKeyVaultReference : { value: '' }
   azureVaultName: { value: '[parameters(\'azureVaultName\')]' }
   azureManagedIdentityClientId: { value: '[parameters(\'azureManagedIdentityClientId\')]' }
   azureManagedIdentityResourceId: { value: '[parameters(\'azureManagedIdentityResourceId\')]' }
@@ -286,7 +275,7 @@ var commonTemplateParameterValues = {
   memberCid: { value: '[parameters(\'memberCid\')]' }
   sensorUpdatePolicy: { value: '[parameters(\'sensorUpdatePolicy\')]' }
   disableProxy: { value: '[parameters(\'disableProxy\')]' }
-  provisioningToken: { value: '[parameters(\'provisioningToken\')]' }
+  provisioningToken: provisioningTokenFromKeyVault ? provisioningTokenKeyVaultReference : { value: '' }
   proxySettings: { value: '[parameters(\'proxySettings\')]' }
   tags: { value: '[parameters(\'tags\')]' }
   extensionSettings: { value: '[parameters(\'extensionSettings\')]' }
@@ -302,9 +291,6 @@ var windowsTemplateParameterValues = union(commonTemplateParameterValues, {
 
 var commonLinuxAssignmentParameters = {
   effect: { value: policyEffect }
-  clientId: { value: clientId }
-  clientSecret: { value: clientSecret }
-  accessToken: { value: accessToken }
   azureVaultName: { value: azureVaultName }
   azureManagedIdentityClientId: { value: azureManagedIdentityClientId }
   azureManagedIdentityResourceId: { value: azureManagedIdentityResourceId }
@@ -312,7 +298,6 @@ var commonLinuxAssignmentParameters = {
   memberCid: { value: memberCid }
   sensorUpdatePolicy: { value: sensorUpdatePolicy }
   disableProxy: { value: disableProxy }
-  provisioningToken: { value: provisioningToken }
   proxySettings: { value: proxySettings }
   tags: { value: tags }
   extensionSettings: { value: extensionSettings }
@@ -1171,6 +1156,47 @@ resource windowsArcRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-
     principalId: windowsArcPolicyAssignment!.identity.principalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', arcRoleDefinitionId)
     principalType: 'ServicePrincipal'
+  }
+}
+
+// ──────────────────────────────────────────────────
+// Key Vault reference access
+// ──────────────────────────────────────────────────
+
+// Least-privilege role that lets ARM resolve Key Vault references during policy remediation.
+// Key Vault Contributor also grants this action, but can modify vault access configuration.
+resource keyVaultDeployRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = if (createRoleAssignments && useKeyVaultReferences) {
+  name: guid(subscription().id, 'CS-Falcon-KeyVault-Deploy')
+  properties: {
+    roleName: 'CrowdStrike Falcon Key Vault Template Deploy (${subscription().subscriptionId})'
+    description: 'Allows Azure Resource Manager to resolve Key Vault references during CrowdStrike Falcon policy remediation'
+    type: 'CustomRole'
+    permissions: [
+      {
+        actions: [
+          'Microsoft.KeyVault/vaults/deploy/action'
+        ]
+        notActions: []
+      }
+    ]
+    assignableScopes: union([subscription().id], ['/subscriptions/${keyVaultIdParts[2]}'])
+  }
+}
+
+var policyAssignmentPrincipalIds = concat(
+  (operatingSystemLower == 'linux' || operatingSystemLower == 'both') ? [linuxVmPolicyAssignment!.identity.principalId, linuxVmssPolicyAssignment!.identity.principalId] : [],
+  (operatingSystemLower == 'windows' || operatingSystemLower == 'both') ? [windowsVmPolicyAssignment!.identity.principalId, windowsVmssPolicyAssignment!.identity.principalId] : [],
+  (deployToArc && (operatingSystemLower == 'linux' || operatingSystemLower == 'both')) ? [linuxArcPolicyAssignment!.identity.principalId] : [],
+  (deployToArc && (operatingSystemLower == 'windows' || operatingSystemLower == 'both')) ? [windowsArcPolicyAssignment!.identity.principalId] : []
+)
+
+module keyVaultDeployAccess 'keyvault-deploy-access.bicep' = if (createRoleAssignments && useKeyVaultReferences) {
+  name: 'CS-Falcon-KeyVault-Deploy-Access'
+  scope: resourceGroup(keyVaultIdParts[2], keyVaultIdParts[4])
+  params: {
+    vaultName: keyVaultIdParts[8]
+    roleDefinitionId: subscriptionResourceId(keyVaultIdParts[2], 'Microsoft.Authorization/roleDefinitions', keyVaultDeployRole.name)
+    principalIds: policyAssignmentPrincipalIds
   }
 }
 
