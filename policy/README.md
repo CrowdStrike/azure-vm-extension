@@ -284,10 +284,12 @@ See https://github.com/CrowdStrike/azure-vm-extension?tab=readme-ov-file#falcon-
 
 When using Key Vault authentication with a user-assigned managed identity, the identity must be attached to the VM or VMSS before the extension can use it. The policy templates support automatic identity attachment via the `azureManagedIdentityResourceId` parameter.
 
-When `azureManagedIdentityResourceId` is provided:
-1. The policy deployment attaches the specified user-assigned identity to the VM or VMSS
-2. The extension then deploys with a `dependsOn` on the identity attachment, ensuring correct ordering
-3. The identity type is safely preserved — existing `SystemAssigned` identities are not removed
+When `azureManagedIdentityResourceId` is provided, each remediation:
+1. Reads the identities currently attached to the VM or VMSS
+2. Adds the specified user-assigned identity to them. Other user-assigned identities stay attached, and an existing system-assigned identity is kept, so its principal ID and role assignments are unchanged
+3. Deploys the extension after the identity is attached
+
+The identity is not written again when it is already attached. A VM or VMSS whose only identity is a single other user-assigned identity is skipped and the extension is not deployed on it, see [Troubleshooting](#vm-or-vmss-skipped-because-it-has-one-user-assigned-identity).
 
 **Example — Key Vault authentication with automatic identity attachment:**
 ```bash
@@ -501,3 +503,29 @@ foreach ($principalId in @($linuxVmPrincipalId, $linuxVmssPrincipalId, $windowsV
 
 > [!NOTE]
 > For management group deployments, read the principal IDs from `az deployment mg show` (or `Get-AzManagementGroupDeployment`), assign the roles at the management group scope, and use the management group as the only assignable scope of the Key Vault role. The vault must be in a subscription under the management group.
+
+## Troubleshooting
+
+### VM or VMSS skipped because it has one user-assigned identity
+
+When `azureManagedIdentityResourceId` is set, the policy leaves a VM or VMSS unchanged if its only identity is a single user-assigned identity, and does not deploy the extension on it. On such a machine, token requests to the Azure Instance Metadata Service (IMDS) that do not name an identity use that single identity. Attaching a second identity makes those requests fail with `Multiple user assigned identities exist, please specify the clientId / resourceId of the identity in the token request`.
+
+These machines stay non-compliant. The remediation's `cs-falcon-install-*` deployment in the machine's resource group reports the reason in its `skipReason` output:
+
+```bash
+az deployment group list --resource-group <rg> \
+  --query "[?starts_with(name, 'cs-falcon-install-')].{name:name, skipReason:properties.outputs.skipReason.value}" \
+  --output table
+```
+
+To install the sensor on one of these machines, either:
+- Update the applications on the machine to name their identity in token requests, attach the CrowdStrike identity, and run a remediation task:
+  ```bash
+  az vm identity assign --resource-group <rg> --name <vm-name> --identities <identity-resource-id>
+  az vmss identity assign --resource-group <rg> --name <vmss-name> --identities <identity-resource-id>
+  ```
+- Or install the extension directly. The policy treats a machine with a successfully installed extension as compliant.
+
+### Remediation fails on VMs that take more than 10 minutes to provision
+
+For a new or updated VM or VMSS, Azure Policy deploys the extension 10 minutes after the create or update request. If provisioning is still running at that point, the deployment can fail, and Azure Policy does not retry it. Run a remediation task after provisioning completes.

@@ -289,6 +289,134 @@ var windowsTemplateParameterValues = union(commonTemplateParameterValues, {
   vdi: { value: '[parameters(\'vdi\')]' }
 })
 
+// VM and VMSS remediation runs in two nested deployments so the identity attachment adds to the
+// identities already on the resource instead of replacing them. The read deployment returns the
+// resource's current identity, and the install deployment merges into it and deploys the extension.
+var remediationDeploymentNames = {
+  identityReadDeploymentName: '[concat(\'cs-falcon-read-\', uniqueString(deployment().name))]'
+  falconInstallDeploymentName: '[concat(\'cs-falcon-install-\', uniqueString(deployment().name))]'
+}
+
+var vmIdentityReadDeployment = {
+  name: '[variables(\'identityReadDeploymentName\')]'
+  type: 'Microsoft.Resources/deployments'
+  apiVersion: '2022-09-01'
+  properties: {
+    mode: 'Incremental'
+    template: {
+      '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
+      contentVersion: '1.0.0.0'
+      resources: []
+      outputs: {
+        identity: {
+          type: 'object'
+          value: '[if(contains(reference(resourceId(\'Microsoft.Compute/virtualMachines\', parameters(\'resourceName\')), \'2023-09-01\', \'Full\'), \'identity\'), reference(resourceId(\'Microsoft.Compute/virtualMachines\', parameters(\'resourceName\')), \'2023-09-01\', \'Full\').identity, createObject())]'
+        }
+      }
+    }
+  }
+}
+
+var vmssIdentityReadDeployment = {
+  name: '[variables(\'identityReadDeploymentName\')]'
+  type: 'Microsoft.Resources/deployments'
+  apiVersion: '2022-09-01'
+  properties: {
+    mode: 'Incremental'
+    template: {
+      '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
+      contentVersion: '1.0.0.0'
+      resources: []
+      outputs: {
+        identity: {
+          type: 'object'
+          value: '[if(contains(reference(resourceId(\'Microsoft.Compute/virtualMachineScaleSets\', parameters(\'resourceName\')), \'2023-09-01\', \'Full\'), \'identity\'), reference(resourceId(\'Microsoft.Compute/virtualMachineScaleSets\', parameters(\'resourceName\')), \'2023-09-01\', \'Full\').identity, createObject())]'
+        }
+      }
+    }
+  }
+}
+
+var commonInstallTemplateParameters = union(commonTemplateParameters, {
+  currentIdentity: { type: 'object' }
+})
+
+var windowsInstallTemplateParameters = union(windowsTemplateParameters, {
+  currentIdentity: { type: 'object' }
+})
+
+var commonInstallParameterValues = {
+  resourceName: { value: '[parameters(\'resourceName\')]' }
+  location: { value: '[parameters(\'location\')]' }
+  clientId: { value: '[parameters(\'clientId\')]' }
+  clientSecret: { value: '[parameters(\'clientSecret\')]' }
+  accessToken: { value: '[parameters(\'accessToken\')]' }
+  azureVaultName: { value: '[parameters(\'azureVaultName\')]' }
+  azureManagedIdentityClientId: { value: '[parameters(\'azureManagedIdentityClientId\')]' }
+  azureManagedIdentityResourceId: { value: '[parameters(\'azureManagedIdentityResourceId\')]' }
+  cloud: { value: '[parameters(\'cloud\')]' }
+  memberCid: { value: '[parameters(\'memberCid\')]' }
+  sensorUpdatePolicy: { value: '[parameters(\'sensorUpdatePolicy\')]' }
+  disableProxy: { value: '[parameters(\'disableProxy\')]' }
+  provisioningToken: { value: '[parameters(\'provisioningToken\')]' }
+  proxySettings: { value: '[parameters(\'proxySettings\')]' }
+  tags: { value: '[parameters(\'tags\')]' }
+  extensionSettings: { value: '[parameters(\'extensionSettings\')]' }
+  currentIdentity: { value: '[reference(variables(\'identityReadDeploymentName\')).outputs.identity.value]' }
+}
+
+var windowsInstallParameterValues = union(commonInstallParameterValues, {
+  pacUrl: { value: '[parameters(\'pacUrl\')]' }
+  disableProvisioningWait: { value: '[parameters(\'disableProvisioningWait\')]' }
+  disableStart: { value: '[parameters(\'disableStart\')]' }
+  provisioningWaitTime: { value: '[parameters(\'provisioningWaitTime\')]' }
+  vdi: { value: '[parameters(\'vdi\')]' }
+})
+
+// A resource whose only identity is a single user-assigned identity is skipped entirely: IMDS uses
+// that identity by default, and attaching a second one breaks token requests that do not name one.
+var identityMergeVariables = {
+  existingIdentities: '[if(contains(parameters(\'currentIdentity\'), \'userAssignedIdentities\'), parameters(\'currentIdentity\').userAssignedIdentities, createObject())]'
+  identityType: '[if(contains(parameters(\'currentIdentity\'), \'type\'), parameters(\'currentIdentity\').type, \'\')]'
+  identityAlreadyAttached: '[contains(variables(\'existingIdentities\'), parameters(\'azureManagedIdentityResourceId\'))]'
+  singleOtherIdentity: '[and(equals(variables(\'identityType\'), \'UserAssigned\'), equals(length(variables(\'existingIdentities\')), 1), not(variables(\'identityAlreadyAttached\')))]'
+  attachIdentity: '[and(not(empty(parameters(\'azureManagedIdentityResourceId\'))), not(variables(\'identityAlreadyAttached\')), not(variables(\'singleOtherIdentity\')))]'
+  installExtension: '[or(empty(parameters(\'azureManagedIdentityResourceId\')), not(variables(\'singleOtherIdentity\')))]'
+  identityTypeValue: '[if(contains(variables(\'identityType\'), \'SystemAssigned\'), \'SystemAssigned,UserAssigned\', \'UserAssigned\')]'
+  userAssignedIdentitiesValue: '[if(variables(\'attachIdentity\'), union(variables(\'existingIdentities\'), createObject(parameters(\'azureManagedIdentityResourceId\'), createObject())), variables(\'existingIdentities\'))]'
+}
+
+var vmIdentityWrite = {
+  condition: '[variables(\'attachIdentity\')]'
+  name: '[parameters(\'resourceName\')]'
+  type: 'Microsoft.Compute/virtualMachines'
+  apiVersion: '2023-09-01'
+  location: '[parameters(\'location\')]'
+  identity: {
+    type: '[variables(\'identityTypeValue\')]'
+    userAssignedIdentities: '[variables(\'userAssignedIdentitiesValue\')]'
+  }
+}
+
+var vmssIdentityWrite = {
+  condition: '[variables(\'attachIdentity\')]'
+  name: '[parameters(\'resourceName\')]'
+  type: 'Microsoft.Compute/virtualMachineScaleSets'
+  apiVersion: '2023-09-01'
+  location: '[parameters(\'location\')]'
+  identity: {
+    type: '[variables(\'identityTypeValue\')]'
+    userAssignedIdentities: '[variables(\'userAssignedIdentitiesValue\')]'
+  }
+}
+
+var identitySkipOutputs = {
+  skipReason: {
+    type: 'string'
+    value: '[if(variables(\'installExtension\'), \'\', \'Skipped: the resource has a single user-assigned managed identity and no system-assigned identity. Attaching the CrowdStrike identity would change the identity that IMDS uses by default. See the Troubleshooting section of the policy README.\')]'
+  }
+}
+
 var commonLinuxAssignmentParameters = {
   effect: { value: policyEffect }
   azureVaultName: { value: azureVaultName }
@@ -369,49 +497,64 @@ resource linuxVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@2020
                 '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
                 contentVersion: '1.0.0.0'
                 parameters: commonTemplateParameters
+                variables: remediationDeploymentNames
                 resources: [
+                  vmIdentityReadDeployment
                   {
-                    condition: '[not(empty(parameters(\'azureManagedIdentityResourceId\')))]'
-                    name: '[parameters(\'resourceName\')]'
-                    type: 'Microsoft.Compute/virtualMachines'
-                    apiVersion: '2023-09-01'
-                    location: '[parameters(\'location\')]'
-                    identity: {
-                      type: 'UserAssigned'
-                      userAssignedIdentities: {
-                        '[parameters(\'azureManagedIdentityResourceId\')]': {}
-                      }
-                    }
-                  }
-                  {
-                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeTestFalconSensor\')]'
-                    type: 'Microsoft.Compute/virtualMachines/extensions'
-                    location: '[parameters(\'location\')]'
-                    apiVersion: '2021-07-01'
+                    name: '[variables(\'falconInstallDeploymentName\')]'
+                    type: 'Microsoft.Resources/deployments'
+                    apiVersion: '2022-09-01'
                     dependsOn: [
-                      '[parameters(\'resourceName\')]'
+                      '[variables(\'identityReadDeploymentName\')]'
                     ]
                     properties: {
-                      publisher: 'Crowdstrike.Falcon'
-                      type: 'TestFalconSensorLinux'
-                      typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
-                      autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
-                      settings: {
-                        azure_vault_name: '[parameters(\'azureVaultName\')]'
-                        azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
-                        cloud: '[parameters(\'cloud\')]'
-                        member_cid: '[parameters(\'memberCid\')]'
-                        sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
-                        disable_proxy: '[parameters(\'disableProxy\')]'
-                        proxy_host: '[parameters(\'proxySettings\').proxyHost]'
-                        proxy_port: '[parameters(\'proxySettings\').proxyPort]'
-                        tags: '[parameters(\'tags\')]'
+                      mode: 'Incremental'
+                      expressionEvaluationOptions: {
+                        scope: 'inner'
                       }
-                      protectedSettings: {
-                        client_id: '[parameters(\'clientId\')]'
-                        client_secret: '[parameters(\'clientSecret\')]'
-                        access_token: '[parameters(\'accessToken\')]'
-                        provisioning_token: '[parameters(\'provisioningToken\')]'
+                      parameters: commonInstallParameterValues
+                      template: {
+                        '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
+                        contentVersion: '1.0.0.0'
+                        parameters: commonInstallTemplateParameters
+                        variables: identityMergeVariables
+                        resources: [
+                          vmIdentityWrite
+                          {
+                            condition: '[variables(\'installExtension\')]'
+                            name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeTestFalconSensor\')]'
+                            type: 'Microsoft.Compute/virtualMachines/extensions'
+                            location: '[parameters(\'location\')]'
+                            apiVersion: '2021-07-01'
+                            dependsOn: [
+                              '[parameters(\'resourceName\')]'
+                            ]
+                            properties: {
+                              publisher: 'Crowdstrike.Falcon'
+                              type: 'TestFalconSensorLinux'
+                              typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
+                              autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
+                              settings: {
+                                azure_vault_name: '[parameters(\'azureVaultName\')]'
+                                azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
+                                cloud: '[parameters(\'cloud\')]'
+                                member_cid: '[parameters(\'memberCid\')]'
+                                sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
+                                disable_proxy: '[parameters(\'disableProxy\')]'
+                                proxy_host: '[parameters(\'proxySettings\').proxyHost]'
+                                proxy_port: '[parameters(\'proxySettings\').proxyPort]'
+                                tags: '[parameters(\'tags\')]'
+                              }
+                              protectedSettings: {
+                                client_id: '[parameters(\'clientId\')]'
+                                client_secret: '[parameters(\'clientSecret\')]'
+                                access_token: '[parameters(\'accessToken\')]'
+                                provisioning_token: '[parameters(\'provisioningToken\')]'
+                              }
+                            }
+                          }
+                        ]
+                        outputs: identitySkipOutputs
                       }
                     }
                   }
@@ -484,49 +627,64 @@ resource linuxVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                 '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
                 contentVersion: '1.0.0.0'
                 parameters: commonTemplateParameters
+                variables: remediationDeploymentNames
                 resources: [
+                  vmssIdentityReadDeployment
                   {
-                    condition: '[not(empty(parameters(\'azureManagedIdentityResourceId\')))]'
-                    name: '[parameters(\'resourceName\')]'
-                    type: 'Microsoft.Compute/virtualMachineScaleSets'
-                    apiVersion: '2023-09-01'
-                    location: '[parameters(\'location\')]'
-                    identity: {
-                      type: 'UserAssigned'
-                      userAssignedIdentities: {
-                        '[parameters(\'azureManagedIdentityResourceId\')]': {}
-                      }
-                    }
-                  }
-                  {
-                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeTestFalconSensor\')]'
-                    type: 'Microsoft.Compute/virtualMachineScaleSets/extensions'
-                    location: '[parameters(\'location\')]'
-                    apiVersion: '2021-07-01'
+                    name: '[variables(\'falconInstallDeploymentName\')]'
+                    type: 'Microsoft.Resources/deployments'
+                    apiVersion: '2022-09-01'
                     dependsOn: [
-                      '[parameters(\'resourceName\')]'
+                      '[variables(\'identityReadDeploymentName\')]'
                     ]
                     properties: {
-                      publisher: 'Crowdstrike.Falcon'
-                      type: 'TestFalconSensorLinux'
-                      typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
-                      autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
-                      settings: {
-                        azure_vault_name: '[parameters(\'azureVaultName\')]'
-                        azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
-                        cloud: '[parameters(\'cloud\')]'
-                        member_cid: '[parameters(\'memberCid\')]'
-                        sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
-                        disable_proxy: '[parameters(\'disableProxy\')]'
-                        proxy_host: '[parameters(\'proxySettings\').proxyHost]'
-                        proxy_port: '[parameters(\'proxySettings\').proxyPort]'
-                        tags: '[parameters(\'tags\')]'
+                      mode: 'Incremental'
+                      expressionEvaluationOptions: {
+                        scope: 'inner'
                       }
-                      protectedSettings: {
-                        client_id: '[parameters(\'clientId\')]'
-                        client_secret: '[parameters(\'clientSecret\')]'
-                        access_token: '[parameters(\'accessToken\')]'
-                        provisioning_token: '[parameters(\'provisioningToken\')]'
+                      parameters: commonInstallParameterValues
+                      template: {
+                        '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
+                        contentVersion: '1.0.0.0'
+                        parameters: commonInstallTemplateParameters
+                        variables: identityMergeVariables
+                        resources: [
+                          vmssIdentityWrite
+                          {
+                            condition: '[variables(\'installExtension\')]'
+                            name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeTestFalconSensor\')]'
+                            type: 'Microsoft.Compute/virtualMachineScaleSets/extensions'
+                            location: '[parameters(\'location\')]'
+                            apiVersion: '2021-07-01'
+                            dependsOn: [
+                              '[parameters(\'resourceName\')]'
+                            ]
+                            properties: {
+                              publisher: 'Crowdstrike.Falcon'
+                              type: 'TestFalconSensorLinux'
+                              typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
+                              autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
+                              settings: {
+                                azure_vault_name: '[parameters(\'azureVaultName\')]'
+                                azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
+                                cloud: '[parameters(\'cloud\')]'
+                                member_cid: '[parameters(\'memberCid\')]'
+                                sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
+                                disable_proxy: '[parameters(\'disableProxy\')]'
+                                proxy_host: '[parameters(\'proxySettings\').proxyHost]'
+                                proxy_port: '[parameters(\'proxySettings\').proxyPort]'
+                                tags: '[parameters(\'tags\')]'
+                              }
+                              protectedSettings: {
+                                client_id: '[parameters(\'clientId\')]'
+                                client_secret: '[parameters(\'clientSecret\')]'
+                                access_token: '[parameters(\'accessToken\')]'
+                                provisioning_token: '[parameters(\'provisioningToken\')]'
+                              }
+                            }
+                          }
+                        ]
+                        outputs: identitySkipOutputs
                       }
                     }
                   }
@@ -629,54 +787,69 @@ resource windowsVmPolicyDefinition 'Microsoft.Authorization/policyDefinitions@20
                 '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
                 contentVersion: '1.0.0.0'
                 parameters: windowsTemplateParameters
+                variables: remediationDeploymentNames
                 resources: [
+                  vmIdentityReadDeployment
                   {
-                    condition: '[not(empty(parameters(\'azureManagedIdentityResourceId\')))]'
-                    name: '[parameters(\'resourceName\')]'
-                    type: 'Microsoft.Compute/virtualMachines'
-                    apiVersion: '2023-09-01'
-                    location: '[parameters(\'location\')]'
-                    identity: {
-                      type: 'UserAssigned'
-                      userAssignedIdentities: {
-                        '[parameters(\'azureManagedIdentityResourceId\')]': {}
-                      }
-                    }
-                  }
-                  {
-                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeTestFalconSensor\')]'
-                    type: 'Microsoft.Compute/virtualMachines/extensions'
-                    location: '[parameters(\'location\')]'
-                    apiVersion: '2021-07-01'
+                    name: '[variables(\'falconInstallDeploymentName\')]'
+                    type: 'Microsoft.Resources/deployments'
+                    apiVersion: '2022-09-01'
                     dependsOn: [
-                      '[parameters(\'resourceName\')]'
+                      '[variables(\'identityReadDeploymentName\')]'
                     ]
                     properties: {
-                      publisher: 'Crowdstrike.Falcon'
-                      type: 'TestFalconSensorWindows'
-                      typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
-                      autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
-                      settings: {
-                        azure_vault_name: '[parameters(\'azureVaultName\')]'
-                        azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
-                        cloud: '[parameters(\'cloud\')]'
-                        member_cid: '[parameters(\'memberCid\')]'
-                        sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
-                        disable_proxy: '[parameters(\'disableProxy\')]'
-                        proxy_host: '[parameters(\'proxySettings\').proxyHost]'
-                        proxy_port: '[parameters(\'proxySettings\').proxyPort]'
-                        tags: '[parameters(\'tags\')]'
-                        pac_url: '[parameters(\'pacUrl\')]'
-                        disable_provisioning_wait: '[parameters(\'disableProvisioningWait\')]'
-                        disable_start: '[parameters(\'disableStart\')]'
-                        provisioning_wait_time: '[parameters(\'provisioningWaitTime\')]'
-                        vdi: '[parameters(\'vdi\')]'
+                      mode: 'Incremental'
+                      expressionEvaluationOptions: {
+                        scope: 'inner'
                       }
-                      protectedSettings: {
-                        client_id: '[parameters(\'clientId\')]'
-                        client_secret: '[parameters(\'clientSecret\')]'
-                        access_token: '[parameters(\'accessToken\')]'
-                        provisioning_token: '[parameters(\'provisioningToken\')]'
+                      parameters: windowsInstallParameterValues
+                      template: {
+                        '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
+                        contentVersion: '1.0.0.0'
+                        parameters: windowsInstallTemplateParameters
+                        variables: identityMergeVariables
+                        resources: [
+                          vmIdentityWrite
+                          {
+                            condition: '[variables(\'installExtension\')]'
+                            name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeTestFalconSensor\')]'
+                            type: 'Microsoft.Compute/virtualMachines/extensions'
+                            location: '[parameters(\'location\')]'
+                            apiVersion: '2021-07-01'
+                            dependsOn: [
+                              '[parameters(\'resourceName\')]'
+                            ]
+                            properties: {
+                              publisher: 'Crowdstrike.Falcon'
+                              type: 'TestFalconSensorWindows'
+                              typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
+                              autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
+                              settings: {
+                                azure_vault_name: '[parameters(\'azureVaultName\')]'
+                                azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
+                                cloud: '[parameters(\'cloud\')]'
+                                member_cid: '[parameters(\'memberCid\')]'
+                                sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
+                                disable_proxy: '[parameters(\'disableProxy\')]'
+                                proxy_host: '[parameters(\'proxySettings\').proxyHost]'
+                                proxy_port: '[parameters(\'proxySettings\').proxyPort]'
+                                tags: '[parameters(\'tags\')]'
+                                pac_url: '[parameters(\'pacUrl\')]'
+                                disable_provisioning_wait: '[parameters(\'disableProvisioningWait\')]'
+                                disable_start: '[parameters(\'disableStart\')]'
+                                provisioning_wait_time: '[parameters(\'provisioningWaitTime\')]'
+                                vdi: '[parameters(\'vdi\')]'
+                              }
+                              protectedSettings: {
+                                client_id: '[parameters(\'clientId\')]'
+                                client_secret: '[parameters(\'clientSecret\')]'
+                                access_token: '[parameters(\'accessToken\')]'
+                                provisioning_token: '[parameters(\'provisioningToken\')]'
+                              }
+                            }
+                          }
+                        ]
+                        outputs: identitySkipOutputs
                       }
                     }
                   }
@@ -749,54 +922,69 @@ resource windowsVmssPolicyDefinition 'Microsoft.Authorization/policyDefinitions@
                 '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
                 contentVersion: '1.0.0.0'
                 parameters: windowsTemplateParameters
+                variables: remediationDeploymentNames
                 resources: [
+                  vmssIdentityReadDeployment
                   {
-                    condition: '[not(empty(parameters(\'azureManagedIdentityResourceId\')))]'
-                    name: '[parameters(\'resourceName\')]'
-                    type: 'Microsoft.Compute/virtualMachineScaleSets'
-                    apiVersion: '2023-09-01'
-                    location: '[parameters(\'location\')]'
-                    identity: {
-                      type: 'UserAssigned'
-                      userAssignedIdentities: {
-                        '[parameters(\'azureManagedIdentityResourceId\')]': {}
-                      }
-                    }
-                  }
-                  {
-                    name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeTestFalconSensor\')]'
-                    type: 'Microsoft.Compute/virtualMachineScaleSets/extensions'
-                    location: '[parameters(\'location\')]'
-                    apiVersion: '2021-07-01'
+                    name: '[variables(\'falconInstallDeploymentName\')]'
+                    type: 'Microsoft.Resources/deployments'
+                    apiVersion: '2022-09-01'
                     dependsOn: [
-                      '[parameters(\'resourceName\')]'
+                      '[variables(\'identityReadDeploymentName\')]'
                     ]
                     properties: {
-                      publisher: 'Crowdstrike.Falcon'
-                      type: 'TestFalconSensorWindows'
-                      typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
-                      autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
-                      settings: {
-                        azure_vault_name: '[parameters(\'azureVaultName\')]'
-                        azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
-                        cloud: '[parameters(\'cloud\')]'
-                        member_cid: '[parameters(\'memberCid\')]'
-                        sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
-                        disable_proxy: '[parameters(\'disableProxy\')]'
-                        proxy_host: '[parameters(\'proxySettings\').proxyHost]'
-                        proxy_port: '[parameters(\'proxySettings\').proxyPort]'
-                        tags: '[parameters(\'tags\')]'
-                        pac_url: '[parameters(\'pacUrl\')]'
-                        disable_provisioning_wait: '[parameters(\'disableProvisioningWait\')]'
-                        disable_start: '[parameters(\'disableStart\')]'
-                        provisioning_wait_time: '[parameters(\'provisioningWaitTime\')]'
-                        vdi: '[parameters(\'vdi\')]'
+                      mode: 'Incremental'
+                      expressionEvaluationOptions: {
+                        scope: 'inner'
                       }
-                      protectedSettings: {
-                        client_id: '[parameters(\'clientId\')]'
-                        client_secret: '[parameters(\'clientSecret\')]'
-                        access_token: '[parameters(\'accessToken\')]'
-                        provisioning_token: '[parameters(\'provisioningToken\')]'
+                      parameters: windowsInstallParameterValues
+                      template: {
+                        '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
+                        contentVersion: '1.0.0.0'
+                        parameters: windowsInstallTemplateParameters
+                        variables: identityMergeVariables
+                        resources: [
+                          vmssIdentityWrite
+                          {
+                            condition: '[variables(\'installExtension\')]'
+                            name: '[concat(parameters(\'resourceName\'), \'/CrowdStrikeTestFalconSensor\')]'
+                            type: 'Microsoft.Compute/virtualMachineScaleSets/extensions'
+                            location: '[parameters(\'location\')]'
+                            apiVersion: '2021-07-01'
+                            dependsOn: [
+                              '[parameters(\'resourceName\')]'
+                            ]
+                            properties: {
+                              publisher: 'Crowdstrike.Falcon'
+                              type: 'TestFalconSensorWindows'
+                              typeHandlerVersion: '[parameters(\'extensionSettings\').handlerVersion]'
+                              autoUpgradeMinorVersion: '[parameters(\'extensionSettings\').autoUpgradeMinorVersion]'
+                              settings: {
+                                azure_vault_name: '[parameters(\'azureVaultName\')]'
+                                azure_managed_identity_client_id: '[parameters(\'azureManagedIdentityClientId\')]'
+                                cloud: '[parameters(\'cloud\')]'
+                                member_cid: '[parameters(\'memberCid\')]'
+                                sensor_update_policy: '[parameters(\'sensorUpdatePolicy\')]'
+                                disable_proxy: '[parameters(\'disableProxy\')]'
+                                proxy_host: '[parameters(\'proxySettings\').proxyHost]'
+                                proxy_port: '[parameters(\'proxySettings\').proxyPort]'
+                                tags: '[parameters(\'tags\')]'
+                                pac_url: '[parameters(\'pacUrl\')]'
+                                disable_provisioning_wait: '[parameters(\'disableProvisioningWait\')]'
+                                disable_start: '[parameters(\'disableStart\')]'
+                                provisioning_wait_time: '[parameters(\'provisioningWaitTime\')]'
+                                vdi: '[parameters(\'vdi\')]'
+                              }
+                              protectedSettings: {
+                                client_id: '[parameters(\'clientId\')]'
+                                client_secret: '[parameters(\'clientSecret\')]'
+                                access_token: '[parameters(\'accessToken\')]'
+                                provisioning_token: '[parameters(\'provisioningToken\')]'
+                              }
+                            }
+                          }
+                        ]
+                        outputs: identitySkipOutputs
                       }
                     }
                   }
