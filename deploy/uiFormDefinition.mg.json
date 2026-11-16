@@ -1,0 +1,231 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2021-09-09/uiFormDefinition.schema.json#",
+  "view": {
+    "kind": "Form",
+    "properties": {
+      "title": "Deploy CrowdStrike Falcon Azure Policy (Management Group)",
+      "steps": [
+        {
+          "name": "basics",
+          "label": "Basics",
+          "elements": [
+            {
+              "name": "intro",
+              "type": "Microsoft.Common.InfoBox",
+              "visible": true,
+              "options": {
+                "icon": "Info",
+                "text": "Deploys the CrowdStrike Falcon Azure Policy at the selected management group scope. Provide your CrowdStrike API credentials below — all other settings use sensible defaults (DeployIfNotExists, both OSes, role assignments created automatically).",
+                "uri": "https://github.com/CrowdStrike/azure-vm-extension/tree/main"
+              }
+            },
+            {
+              "name": "managementGroup",
+              "type": "Microsoft.Common.ManagementGroupSelector",
+              "label": "Management group",
+              "toolTip": "The management group to create the policy definitions and assignments in (includes the tenant root group). Requires Management Group Reader to list groups.",
+              "constraints": [
+                {
+                  "isValid": "[not(empty(steps('basics').managementGroup.managementGroupId))]",
+                  "message": "Select a management group."
+                }
+              ],
+              "visible": true
+            },
+            {
+              "name": "location",
+              "type": "Microsoft.Common.DropDown",
+              "label": "Deployment location",
+              "defaultValue": "East US",
+              "toolTip": "Azure region used to store the management-group deployment metadata.",
+              "constraints": {
+                "required": true,
+                "allowedValues": [
+                  { "label": "East US", "value": "eastus" },
+                  { "label": "East US 2", "value": "eastus2" },
+                  { "label": "Central US", "value": "centralus" },
+                  { "label": "South Central US", "value": "southcentralus" },
+                  { "label": "West US 2", "value": "westus2" },
+                  { "label": "West US 3", "value": "westus3" },
+                  { "label": "Canada Central", "value": "canadacentral" },
+                  { "label": "North Europe", "value": "northeurope" },
+                  { "label": "West Europe", "value": "westeurope" },
+                  { "label": "UK South", "value": "uksouth" },
+                  { "label": "France Central", "value": "francecentral" },
+                  { "label": "Germany West Central", "value": "germanywestcentral" },
+                  { "label": "Sweden Central", "value": "swedencentral" },
+                  { "label": "Australia East", "value": "australiaeast" },
+                  { "label": "Southeast Asia", "value": "southeastasia" },
+                  { "label": "Japan East", "value": "japaneast" },
+                  { "label": "Central India", "value": "centralindia" },
+                  { "label": "UAE North", "value": "uaenorth" }
+                ]
+              }
+            },
+            {
+              "name": "authenticationMethod",
+              "type": "Microsoft.Common.OptionsGroup",
+              "label": "Authentication Method",
+              "defaultValue": "OAuth2 Credentials",
+              "toolTip": "How the Falcon sensor authenticates to the CrowdStrike API.",
+              "constraints": {
+                "allowedValues": [
+                  { "label": "OAuth2 Credentials", "value": "oauth2" },
+                  { "label": "Access Token", "value": "token" },
+                  { "label": "Azure Key Vault", "value": "vault" }
+                ]
+              }
+            },
+            {
+              "name": "clientId",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Client ID",
+              "toolTip": "CrowdStrike API Client ID.",
+              "constraints": {
+                "required": true,
+                "regex": "^[a-fA-F0-9]{32}$",
+                "validationMessage": "Client ID must be a 32-character hexadecimal string."
+              },
+              "visible": "[equals(steps('basics').authenticationMethod, 'oauth2')]"
+            },
+            {
+              "name": "clientSecret",
+              "type": "Microsoft.Common.PasswordBox",
+              "label": { "password": "Client Secret", "confirmPassword": "Confirm Client Secret" },
+              "toolTip": "CrowdStrike API Client Secret.",
+              "constraints": { "required": true },
+              "options": { "hideConfirmation": false },
+              "visible": "[equals(steps('basics').authenticationMethod, 'oauth2')]"
+            },
+            {
+              "name": "accessToken",
+              "type": "Microsoft.Common.PasswordBox",
+              "label": { "password": "Access Token", "confirmPassword": "Confirm Access Token" },
+              "toolTip": "CrowdStrike API Access Token.",
+              "constraints": { "required": true },
+              "options": { "hideConfirmation": false },
+              "visible": "[equals(steps('basics').authenticationMethod, 'token')]"
+            },
+            {
+              "name": "azureVaultName",
+              "type": "Microsoft.Common.TextBox",
+              "label": "Key Vault name",
+              "placeholder": "my-crowdstrike-vault",
+              "toolTip": "Name of the existing Key Vault that holds your FALCON- prefixed secrets.",
+              "constraints": {
+                "required": true,
+                "regex": "^[a-zA-Z0-9-]{3,24}$",
+                "validationMessage": "Vault name must be 3-24 characters: letters, numbers, hyphens."
+              },
+              "visible": "[equals(steps('basics').authenticationMethod, 'vault')]"
+            },
+            {
+              "name": "managedIdentityClientId",
+              "type": "Microsoft.Common.TextBox",
+              "label": "User-assigned identity Client ID (optional)",
+              "placeholder": "00000000-0000-0000-0000-000000000000",
+              "toolTip": "Client ID of a user-assigned managed identity with Key Vault access. Leave blank to use the VM/VMSS system-assigned identity.",
+              "constraints": {
+                "required": false,
+                "regex": "^$|^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$",
+                "validationMessage": "Enter a valid GUID, or leave blank."
+              },
+              "visible": "[equals(steps('basics').authenticationMethod, 'vault')]"
+            },
+            {
+              "name": "managedIdentityResourceId",
+              "type": "Microsoft.Common.TextBox",
+              "label": "User-assigned identity Resource ID (optional)",
+              "placeholder": "/subscriptions/.../providers/Microsoft.ManagedIdentity/userAssignedIdentities/<name>",
+              "toolTip": "Full ARM resource ID of the user-assigned managed identity to attach to VMs/VMSS (required if Client ID is set).",
+              "constraints": {
+                "required": false,
+                "regex": "^$|^/subscriptions/.+/providers/Microsoft.ManagedIdentity/userAssignedIdentities/.+$",
+                "validationMessage": "Enter a valid user-assigned identity resource ID, or leave blank."
+              },
+              "visible": "[equals(steps('basics').authenticationMethod, 'vault')]"
+            },
+            {
+              "name": "vaultInfo",
+              "type": "Microsoft.Common.InfoBox",
+              "visible": "[equals(steps('basics').authenticationMethod, 'vault')]",
+              "options": {
+                "icon": "Info",
+                "text": "Store secrets named FALCON-CLIENT-ID, FALCON-CLIENT-SECRET (or FALCON-ACCESS-TOKEN). VMs read them using their managed identity, which must have Key Vault access (Key Vault Secrets User).",
+                "uri": "https://learn.microsoft.com/azure/key-vault/general/assign-access-policy"
+              }
+            },
+            {
+              "name": "operatingSystem",
+              "type": "Microsoft.Common.DropDown",
+              "label": "Operating systems",
+              "defaultValue": "Both Linux and Windows",
+              "toolTip": "Which operating systems to target.",
+              "constraints": {
+                "allowedValues": [
+                  { "label": "Both Linux and Windows", "value": "both" },
+                  { "label": "Linux only", "value": "linux" },
+                  { "label": "Windows only", "value": "windows" }
+                ]
+              }
+            },
+            {
+              "name": "cloud",
+              "type": "Microsoft.Common.DropDown",
+              "label": "CrowdStrike cloud",
+              "defaultValue": "Auto-discover",
+              "toolTip": "CrowdStrike cloud region.",
+              "constraints": {
+                "allowedValues": [
+                  { "label": "Auto-discover", "value": "autodiscover" },
+                  { "label": "US-1", "value": "us-1" },
+                  { "label": "US-2", "value": "us-2" },
+                  { "label": "EU-1", "value": "eu-1" },
+                  { "label": "US-GOV-1", "value": "us-gov-1" }
+                ]
+              }
+            },
+            {
+              "name": "extensionVersion",
+              "type": "Microsoft.Common.DropDown",
+              "label": "Sensor extension version",
+              "defaultValue": "1.7 (latest)",
+              "toolTip": "CrowdStrike Falcon VM extension handler version to install (major.minor). Minor versions upgrade automatically.",
+              "constraints": {
+                "required": true,
+                "allowedValues": [
+                  { "label": "1.7 (latest)", "value": "1.7" },
+                  { "label": "1.6", "value": "1.6" },
+                  { "label": "1.5", "value": "1.5" },
+                  { "label": "1.3", "value": "1.3" },
+                  { "label": "1.2", "value": "1.2" },
+                  { "label": "1.1", "value": "1.1" },
+                  { "label": "1.0", "value": "1.0" }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "outputs": {
+      "kind": "ManagementGroup",
+      "managementGroupId": "[concat('/providers/Microsoft.Management/managementGroups/', steps('basics').managementGroup.managementGroupId)]",
+      "location": "[steps('basics').location]",
+      "parameters": {
+        "operatingSystem": "[steps('basics').operatingSystem]",
+        "cloud": "[steps('basics').cloud]",
+        "extensionSettings": {
+          "handlerVersion": "[steps('basics').extensionVersion]",
+          "autoUpgradeMinorVersion": true
+        },
+        "clientId": "[if(equals(steps('basics').authenticationMethod, 'oauth2'), steps('basics').clientId, '')]",
+        "clientSecret": "[if(equals(steps('basics').authenticationMethod, 'oauth2'), steps('basics').clientSecret, '')]",
+        "accessToken": "[if(equals(steps('basics').authenticationMethod, 'token'), steps('basics').accessToken, '')]",
+        "azureVaultName": "[if(equals(steps('basics').authenticationMethod, 'vault'), steps('basics').azureVaultName, '')]",
+        "azureManagedIdentityClientId": "[if(equals(steps('basics').authenticationMethod, 'vault'), steps('basics').managedIdentityClientId, '')]",
+        "azureManagedIdentityResourceId": "[if(equals(steps('basics').authenticationMethod, 'vault'), steps('basics').managedIdentityResourceId, '')]"
+      }
+    }
+  }
+}

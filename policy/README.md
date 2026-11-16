@@ -2,6 +2,18 @@
 
 This folder contains Azure Policy templates for automated deployment of CrowdStrike Falcon sensors using the official CrowdStrike VM extensions at scale.
 
+## Deploy to Azure
+
+Deploy the Falcon policy directly from the Azure portal with a guided wizard — no CLI required. Choose the button for your target scope:
+
+| Scope | Deploy |
+|-------|--------|
+| **Subscription** — cover all VMs/VMSS/Arc servers in one subscription | [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FCrowdStrike%2Fazure-vm-extension%2Fmain%2Fdeploy%2FmainTemplate.sub.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2FCrowdStrike%2Fazure-vm-extension%2Fmain%2Fdeploy%2FcreateUiDefinition.json) |
+| **Management group** — cover every subscription under a management group | [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#blade/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2FCrowdStrike%2Fazure-vm-extension%2Fmain%2Fdeploy%2FmainTemplate.mg.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2FCrowdStrike%2Fazure-vm-extension%2Fmain%2Fdeploy%2FuiFormDefinition.mg.json) |
+
+> [!NOTE]
+> These buttons resolve against the `main` branch and activate once merged. For prerequisites, RBAC, pre-merge test buttons, and the full portal walkthrough, see [`deploy/README.md`](../deploy/README.md).
+
 ## Contents
 
 ### Policy Templates
