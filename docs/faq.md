@@ -2,7 +2,11 @@
 
 ### Can I change sensor settings after installation?
 
-Currently, the extension does not support modifying sensor settings after installation. This means that once the sensor is installed with specific configuration parameters (such as tags or proxy settings) through the extension's configuration JSON, you would need to uninstall and reinstall the extension with the new configuration to change these settings. This is because of the sensor's tamper and uninstall protection mechanisms require a maintenance token to modify or uninstall it after installation.s.
+Currently, the extension does not support modifying sensor settings after installation. This means that once the sensor is installed with specific configuration parameters (such as tags or proxy settings) through the extension's configuration JSON, you would need to uninstall and reinstall the extension with the new configuration to change these settings. This is because of the sensor's tamper and uninstall protection mechanisms require a maintenance token to modify or uninstall it after installation.
+
+### Does the extension support Azure Automatic Extension Upgrade?
+
+No. Azure's [Automatic Extension Upgrade](https://learn.microsoft.com/azure/virtual-machines/automatic-extension-upgrade) is only available for extensions on Microsoft's supported list, and Azure does not currently offer an onboarding path for third-party extensions like CrowdStrike Falcon. Microsoft has not committed to a timeline for adding one. Leave `enableAutomaticUpgrade` unset or set to `false`.
 
 ### Can I install the extension without adding the Sensor Update Policy - Write scope to my Oauth token?
 
